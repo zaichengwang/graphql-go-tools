@@ -35,6 +35,11 @@ func (b *dsBuilder) Schema(schema string) *dsBuilder {
 	return b
 }
 
+func (b *dsBuilder) KeysMetadata(keys FederationFieldConfigurations) *dsBuilder {
+	b.ds.FederationMetaData.Keys = keys
+	return b
+}
+
 func (b *dsBuilder) Hash(hash DSHash) *dsBuilder {
 	b.ds.hash = hash
 	return b
@@ -225,7 +230,7 @@ func TestFindBestDataSourceSet(t *testing.T) {
 				type User {
 					id: Int
 					name: String
-				}	
+				}
 			`,
 			Query: `
 				query {
@@ -282,7 +287,7 @@ func TestFindBestDataSourceSet(t *testing.T) {
 					name: String
 					surname: String
 					age: Int
-				}	
+				}
 			`,
 			Query: `
 				query {
@@ -334,7 +339,7 @@ func TestFindBestDataSourceSet(t *testing.T) {
 					age: Int
 					name: String
 					surname: String
-				}	
+				}
 			`,
 			Query: `
 				query {
@@ -426,7 +431,7 @@ func TestFindBestDataSourceSet(t *testing.T) {
 										lines {
 											# TODO: added key id to make test results predictable
 											# revisit if it is not enough rules to help planner
-											id 
+											id
 											line1
 											line2
 										}
@@ -901,12 +906,12 @@ const shareableDS1Schema = `
 		id: ID!
 		details: Details! @shareable
 	}
-	
+
 	type Details {
 		forename: String! @shareable
 		middlename: String!
 	}
-	
+
 	type Query {
 		me: User
 	}
