@@ -78,7 +78,9 @@ func (v *variablesDefaultValueExtractionVisitor) EnterVariableDefinition(ref int
 	}
 
 	// Add not null type for variable
-	v.operation.VariableDefinitions[ref].Type = v.operation.AddNonNullType(v.operation.VariableDefinitions[ref].Type)
+	if !v.operation.TypeIsNonNull(v.operation.VariableDefinitions[ref].Type) {
+		v.operation.VariableDefinitions[ref].Type = v.operation.AddNonNullType(v.operation.VariableDefinitions[ref].Type)
+	}
 
 	variableName := v.operation.VariableDefinitionNameString(ref)
 

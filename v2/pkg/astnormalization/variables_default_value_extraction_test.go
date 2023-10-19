@@ -311,10 +311,24 @@ func TestVariablesDefaultValueExtraction(t *testing.T) {
 								 }`, `{"input":6}`, `{"input":6}`)
 	})
 
-	t.Run("not nullable string with default value", func(t *testing.T) {
+	t.Run("nullable string with default value", func(t *testing.T) {
 		runWithVariablesDefaultValues(t, extractVariablesDefaultValue, variablesDefaultValueExtractionDefinition, `
 								 query q(
 												 $input: String = "DefaultInOperation",
+								 ) {
+												 notNullableString(input: $input)
+								 }`, "", `
+								 query q(
+												 $input: String!,
+								 ) {
+												 notNullableString(input: $input)
+								 }`, ``, `{"input":"DefaultInOperation"}`)
+	})
+
+	t.Run("not nullable string with default value", func(t *testing.T) {
+		runWithVariablesDefaultValues(t, extractVariablesDefaultValue, variablesDefaultValueExtractionDefinition, `
+								 query q(
+												 $input: String! = "DefaultInOperation",
 								 ) {
 												 notNullableString(input: $input)
 								 }`, "", `
