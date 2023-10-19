@@ -16,6 +16,7 @@ const (
 			nullableStringInNestedList(input: [[String]]): String
 			notNullableInt(input: Int! = 5): String
 			notNullableString(input: String! = "DefaultInSchema"): String
+			noArgs(): String
 		}
 		input Nested {
 			NotNullable: String!
@@ -84,7 +85,7 @@ func TestVariablesDefaultValueExtraction(t *testing.T) {
 				mutation simple($in: String = "bar" ) {
 					simple(input: $in)
 				}`, "", `
-				mutation simple($in: String) {
+				mutation simple($in: String!) {
 			  		simple(input: $in)
 				}`, ``, `{"in":"bar"}`)
 		})
@@ -93,7 +94,7 @@ func TestVariablesDefaultValueExtraction(t *testing.T) {
 				mutation simple($in: String = "bar" ) {
 			  		simple(input: $in)
 				}`, "", `
-				mutation simple($in: String) {
+				mutation simple($in: String!) {
 			  		simple(input: $in)
 				}`, `{"in":"foo"}`, `{"in":"foo"}`)
 		})
@@ -119,11 +120,11 @@ func TestVariablesDefaultValueExtraction(t *testing.T) {
 						})
 					}`, "", `
 					query q(
-						$nullable: String,
+						$nullable: String!,
 						$notNullable: String!,
-						$strIntolist: String,
+						$strIntolist: String!,
 						$strIntolistOfNonNull: String!
-						$strIntolistNonNullItemNullable: String,
+						$strIntolistNonNullItemNullable: String!,
 						$strIntolistNonNullItemNotNull: String!
 					) {
 						complex(input: {
@@ -158,10 +159,10 @@ func TestVariablesDefaultValueExtraction(t *testing.T) {
 						})
 					}`, ``, `
 					query q(
-						$nullable: String,
+						$nullable: String!,
 						$notNullable: String!,
-						$list: [String],
-						$listOfNonNull: [String!]
+						$list: [String]!,
+						$listOfNonNull: [String!]!
 						$listNonNullItemNullable: [String]!,
 						$listNonNullItemNotNull: [String!]!
 					) {
@@ -189,7 +190,7 @@ func TestVariablesDefaultValueExtraction(t *testing.T) {
 						objectInList(input: [{NotNullable: $notNullable, Nullable: $nullable}])
 					}`, "", `
 					query q(
-						$nullable: String,
+						$nullable: String!,
 						$notNullable: String!,
 					) {
 						objectInList(input: [{NotNullable: $notNullable, Nullable: $nullable}])
@@ -205,7 +206,7 @@ func TestVariablesDefaultValueExtraction(t *testing.T) {
 						objectInNestedList(input: [[{NotNullable: $notNullable, Nullable: $nullable}]])
 					}`, "", `
 					query q(
-						$nullable: String,
+						$nullable: String!,
 						$notNullable: String!,
 					) {
 						objectInNestedList(input: [[{NotNullable: $notNullable, Nullable: $nullable}]])
@@ -234,7 +235,7 @@ func TestVariablesDefaultValueExtraction(t *testing.T) {
 						nullableStringInNestedList(input: [["a", null, $nullable]])
 					}`, "", `
 					query q(
-						$nullable: String,
+						$nullable: String!,
 					) {
 						nullableStringInNestedList(input: [["a", null, $nullable]])
 					}`, ``, `{"nullable":"foo"}`)
@@ -251,7 +252,7 @@ func TestVariablesDefaultValueExtraction(t *testing.T) {
 				mixedArgs(a: $nullable, b: $notNullable)
 			}`, "", `
 			query q(
-				$nullable: String,
+				$nullable: String!,
 				$notNullable: String!,
 			) {
 				mixedArgs(a: $nullable, b: $notNullable)
@@ -263,9 +264,23 @@ func TestVariablesDefaultValueExtraction(t *testing.T) {
 			mutation simple($a: String = "bar", $b: String = "bazz") {
 				mixed(a: $a, b: $b)
 			}`, "", `
-			mutation simple($a: String, $b: String, $c: String, $d: String!) {
+			mutation simple($a: String!, $b: String!, $c: String, $d: String!) {
 				mixed(a: $a, b: $b, input: $c, nonNullInput: $d)
 			}`, `{"a":"aaa"}`, `{"d":"bar","c":"foo","b":"bazz","a":"aaa"}`)
+	})
+
+	t.Run("Variable as set as not nullable even if they are not used inside query", func(t *testing.T) {
+		runWithVariablesDefaultValues(t, extractVariablesDefaultValue, variablesDefaultValueExtractionDefinition, `
+								 query q(
+												 $input: Boolean = true,
+								 ) {
+												 noArgs() @skip(if: $input)
+								 }`, "", `
+								 query q(
+												 $input: Boolean!,
+								 ) {
+												 noArgs()  @skip(if: $input)
+								 }`, ``, `{"input":true}`)
 	})
 
 	t.Run("Not nullable int with default value", func(t *testing.T) {
