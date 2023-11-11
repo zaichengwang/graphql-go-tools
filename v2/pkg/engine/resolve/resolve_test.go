@@ -326,6 +326,148 @@ func TestResolver_ResolveNode(t *testing.T) {
 			},
 		}, Context{ctx: context.Background(), Variables: []byte(`{"skip":true}`)}, `{"data":{"user":{}}}`
 	}))
+
+	t.Run("aaaaa", testFn(false, func(t *testing.T, ctrl *gomock.Controller) (node Node, ctx Context, expectedOutput string) {
+		return &Object{
+			Fetch: &SingleFetch{
+				FetchConfiguration: FetchConfiguration{DataSource: FakeDataSource(`{ "organizationById": { "brandsV2": { "edges": [ null, null, {"node":{"__typename":"Brand"},"__typename":"OrganizationBrandEdge"}, null, {"node":{"__typename":"Brand"},"__typename":"OrganizationBrandEdge"} ] } } }`)},
+			},
+			Fields: []*Field{
+					{
+							Name: []byte("organizationById"),
+							Value: &Object{
+									Nullable: true,
+									Path: []string{"organizationById"},
+									Fields: []*Field{
+											{
+													Name: []byte("brandsV2"),
+													Value: &Object{
+															Nullable: true,
+															Path: []string{ "brandsV2" },
+															Fields: []*Field{
+																	{
+																			Name: []byte("edges"),
+																			Value: &Array{
+																					Path: []string{ "edges" },
+																					Nullable: true,
+																					ResolveAsynchronous: false,
+																					Item: &Object{
+																							Nullable: true,
+																							Fields: []*Field{
+																									{
+																											Name: []byte("node"),
+																											Value: &Object{
+																													Nullable: true,
+																													Path: []string{ "node" },
+																													Fields: []*Field{
+																															{
+																																	Name: []byte("__typename"),
+																																	Value: &String{
+																																			Path: []string{ "__typename" },
+																																			Nullable: false,
+																																			IsTypeName: true,
+																																	},
+																																	Position: Position{
+																																			Line: 1,
+																																			Column: 309,
+																																	},
+																																	SkipDirectiveDefined: false,
+																																	SkipVariableName: "",
+																																	IncludeDirectiveDefined: false,
+																																	IncludeVariableName: "",
+																															},
+																														},
+																											},
+																											Position: Position{
+																													Line: 1,
+																													Column: 302,
+																											},
+																											SkipDirectiveDefined: false,
+																											SkipVariableName: "",
+																											IncludeDirectiveDefined: false,
+																											IncludeVariableName: "",
+																									},
+																									{
+																											Name: []byte("__typename"),
+																											Value: &String{
+																													Path: []string{ "__typename" },
+																													Nullable: false,
+																													IsTypeName: true,
+																											},
+																											Position: Position{
+																													Line: 1,
+																													Column: 322,
+																											},
+																											SkipDirectiveDefined: false,
+																											SkipVariableName: "",
+																											IncludeDirectiveDefined: false,
+																											IncludeVariableName: "",
+																									},
+																								},
+																					},
+																			},
+																			Position: Position{
+																					Line: 1,
+																					Column: 294,
+																			},
+																			SkipDirectiveDefined: false,
+																			SkipVariableName: "",
+																			IncludeDirectiveDefined: false,
+																			IncludeVariableName: "",
+																	},
+																},
+													},
+													Position: Position{
+															Line: 1,
+															Column: 217,
+													},
+													SkipDirectiveDefined: false,
+													SkipVariableName: "",
+													IncludeDirectiveDefined: false,
+													IncludeVariableName: "",
+											},
+										},
+							},
+							Position: Position{
+									Line: 1,
+									Column: 157,
+							},
+							SkipDirectiveDefined: false,
+							SkipVariableName: "",
+							IncludeDirectiveDefined: false,
+							IncludeVariableName: "",
+					},
+				},
+		}, Context{ctx: context.Background(), Variables: []byte(`{}`)}, `{"data":{"organizationById":{"brandsV2":{"edges":[null,null,{"node":{"__typename":"Brand"},"__typename":"OrganizationBrandEdge"},null,{"node":{"__typename":"Brand"},"__typename":"OrganizationBrandEdge"}]}}}}`
+	}))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 	t.Run("skip multiple fields should resolve to empty response", testFn(false, func(t *testing.T, ctrl *gomock.Controller) (node Node, ctx Context, expectedOutput string) {
 		return &Object{
 			Fields: []*Field{

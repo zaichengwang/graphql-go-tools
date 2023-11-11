@@ -573,6 +573,11 @@ func (r *Resolver) addResolveError(ctx *Context, objectBuf *BufPair) {
 }
 
 func (r *Resolver) resolveObject(ctx *Context, object *Object, data []byte, parentBuf *BufPair) (err error) {
+	if string(data) == "null" {
+		r.resolveNull(parentBuf.Data)
+		return
+	}
+
 	if len(object.Path) != 0 {
 		data, _, _, _ = jsonparser.Get(data, object.Path...)
 		if len(data) == 0 || bytes.Equal(data, null) {
