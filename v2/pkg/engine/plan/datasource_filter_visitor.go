@@ -2,8 +2,6 @@ package plan
 
 import (
 	"fmt"
-	"golang.org/x/exp/slices"
-
 	"github.com/pkg/errors"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
@@ -539,8 +537,23 @@ func (f *DataSourceFilter) selectDuplicateNodes(secondRun bool) {
 	}
 }
 
+func DeleteFunc[S ~[]E, E any](s S, del func(E) bool) S {
+	i := IndexFunc(s, del)
+	if i == -1 {
+		return s
+	}
+	// Don't start copying elements until we find one to delete.
+	for j := i + 1; j < len(s); j++ {
+		if v := s[j]; !del(v) {
+			s[i] = v
+			i++
+		}
+	}
+	return s[:i]
+}
+
 func (f *DataSourceFilter) selectedNodes() (out NodeSuggestions) {
-	return slices.DeleteFunc(f.nodes, func(e NodeSuggestion) bool {
+	return DeleteFunc(f.nodes, func(e NodeSuggestion) bool {
 		return !e.selected
 	})
 }

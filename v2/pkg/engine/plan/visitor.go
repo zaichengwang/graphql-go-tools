@@ -3,7 +3,6 @@ package plan
 import (
 	"bytes"
 	"fmt"
-	"golang.org/x/exp/slices"
 	"reflect"
 	"regexp"
 	"strings"
@@ -324,6 +323,17 @@ func (v *Visitor) EnterField(ref int) {
 	v.mapFieldConfig(ref)
 }
 
+func IndexFunc[S ~[]E, E any](s S, f func(E) bool) int {
+	for i := range s {
+		if f(s[i]) {
+			return i
+		}
+	}
+	return -1
+}
+func ContainsFunc[S ~[]E, E any](s S, f func(E) bool) bool {
+	return IndexFunc(s, f) >= 0
+}
 func (v *Visitor) handleExistingField(currentFieldRef int, fieldDefinitionTypeRef int, fullFieldPathWithoutFragments string) (exists bool) {
 	resolveField := v.fieldByPaths[fullFieldPathWithoutFragments]
 	if resolveField == nil {
@@ -335,7 +345,7 @@ func (v *Visitor) handleExistingField(currentFieldRef int, fieldDefinitionTypeRe
 	hasOnTypeNames := len(resolveField.OnTypeNames) > 0 && len(onTypeNames) > 0
 	if hasOnTypeNames {
 		for _, t := range onTypeNames {
-			if !slices.ContainsFunc(resolveField.OnTypeNames, func(existingT []byte) bool {
+			if !ContainsFunc(resolveField.OnTypeNames, func(existingT []byte) bool {
 				return bytes.Equal(existingT, t)
 			}) {
 				resolveField.OnTypeNames = append(resolveField.OnTypeNames, t)
