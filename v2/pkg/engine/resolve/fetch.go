@@ -154,3 +154,7 @@ type FetchConfiguration struct {
 	// Returning null in this case tells the batch implementation to skip this item
 	SetTemplateOutputToNullOnVariableNull bool
 }
+
+type FetchInfo struct {
+	DataSourceID string
+}

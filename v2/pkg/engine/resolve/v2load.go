@@ -435,6 +435,7 @@ func (l *V2Loader) renderErrorsFailedToFetch(out *bytes.Buffer) error {
 }
 
 func (l *V2Loader) loadSingleFetch(ctx context.Context, fetch *SingleFetch, items []int, res *result) error {
+	res.init(fetch.PostProcessing, fetch.Info)
 	input := pool.BytesBuffer.Get()
 	defer pool.BytesBuffer.Put(input)
 	preparedInput := pool.BytesBuffer.Get()
