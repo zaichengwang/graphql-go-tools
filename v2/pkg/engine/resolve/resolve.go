@@ -29,7 +29,7 @@ type Resolver struct {
 
 type tools struct {
 	resolvable *Resolvable
-	loader     *V2Loader
+	loader     *Loader
 }
 
 // New returns a new Resolver, ctx.Done() is used to cancel all active subscriptions & streams
@@ -42,7 +42,7 @@ func New(ctx context.Context, enableSingleFlightLoader bool) *Resolver {
 			New: func() interface{} {
 				return &tools{
 					resolvable: NewResolvable(),
-					loader:     &V2Loader{},
+					loader:     &Loader{},
 				}
 			},
 		},
