@@ -1,7 +1,7 @@
 package resolve
 
 import (
-	"slices"
+	"golang.org/x/exp/slices"
 )
 
 type Object struct {

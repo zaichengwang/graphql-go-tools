@@ -2,7 +2,7 @@ package plan
 
 import (
 	"fmt"
-	"slices"
+	"golang.org/x/exp/slices"
 
 	"github.com/pkg/errors"
 

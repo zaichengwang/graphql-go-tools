@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"io"
 	"net/http"
 	"regexp"
-	"slices"
 
 	"github.com/buger/jsonparser"
 	"github.com/cespare/xxhash/v2"

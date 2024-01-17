@@ -1,7 +1,7 @@
 package postprocess
 
 import (
-	"slices"
+	"golang.org/x/exp/slices"
 	"strconv"
 	"strings"
 

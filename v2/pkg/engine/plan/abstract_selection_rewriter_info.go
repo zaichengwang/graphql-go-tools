@@ -1,7 +1,7 @@
 package plan
 
 import (
-	"slices"
+	"golang.org/x/exp/slices"
 	"sort"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"

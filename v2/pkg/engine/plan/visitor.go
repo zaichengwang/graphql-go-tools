@@ -3,9 +3,9 @@ package plan
 import (
 	"bytes"
 	"fmt"
+	"golang.org/x/exp/slices"
 	"reflect"
 	"regexp"
-	"slices"
 	"strings"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
