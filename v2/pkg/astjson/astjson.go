@@ -3,13 +3,11 @@ package astjson
 import (
 	"bytes"
 	"fmt"
+	"github.com/buger/jsonparser"
+	"github.com/pkg/errors"
 	"io"
 	"strconv"
 	"sync"
-	"unsafe"
-
-	"github.com/buger/jsonparser"
-	"github.com/pkg/errors"
 )
 
 var (
@@ -112,7 +110,7 @@ func (j *JSON) arrayElemIndex(elem string) int {
 		return -1
 	}
 	subStr := elem[1 : len(elem)-1]
-	out, err := jsonparser.GetInt(unsafe.Slice(unsafe.StringData(subStr), len(subStr)))
+	out, err := jsonparser.GetInt([]byte(subStr))
 	if err != nil {
 		return -1
 	}
