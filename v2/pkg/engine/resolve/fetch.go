@@ -22,6 +22,7 @@ type SingleFetch struct {
 	SerialID             int
 	InputTemplate        InputTemplate
 	DataSourceIdentifier []byte
+	Info                 *FetchInfo
 }
 
 type PostProcessingConfiguration struct {
