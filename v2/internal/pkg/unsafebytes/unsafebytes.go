@@ -21,9 +21,10 @@ func BytesToFloat32(byteSlice []byte) float32 {
 	return float32(out)
 }
 
-func BytesToString(b []byte) string {
-	// Ignore if IDE shows an error here; it's a false positive.
-	return unsafe.String(unsafe.SliceData(b), len(b))
+func BytesToString(bytes []byte) string {
+	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&bytes))
+	stringHeader := reflect.StringHeader{Data: sliceHeader.Data, Len: sliceHeader.Len}
+	return *(*string)(unsafe.Pointer(&stringHeader)) // nolint: govet
 }
 
 func BytesToBool(byteSlice []byte) bool {
