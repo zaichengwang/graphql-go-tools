@@ -3,6 +3,7 @@ package resolve
 import (
 	"bytes"
 	"context"
+	"github.com/hashicorp/go-multierror"
 	"net/http"
 	"strconv"
 
@@ -23,6 +24,15 @@ type Context struct {
 	afterFetchHook   AfterFetchHook
 	position         Position
 	RenameTypeNames  []RenameTypeName
+	subgraphErrors   error
+}
+
+func (c *Context) SubgraphErrors() error {
+	return c.subgraphErrors
+}
+
+func (c *Context) appendSubgraphError(err error) {
+	c.subgraphErrors = multierror.Append(c.subgraphErrors, err)
 }
 
 type Request struct {

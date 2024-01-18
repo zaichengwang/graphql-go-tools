@@ -1,6 +1,6 @@
 module github.com/wundergraph/graphql-go-tools/v2
 
-go 1.19
+go 1.20
 
 require (
 	github.com/99designs/gqlgen v0.17.22
@@ -12,6 +12,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.9
 	github.com/gorilla/websocket v1.5.0
+	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/iancoleman/strcase v0.0.0-20191112232945-16388991a334
 	github.com/jensneuse/abstractlogger v0.0.4
@@ -43,6 +44,7 @@ require (
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/gobwas/httphead v0.0.0-20180130184737-2c6c146eadee // indirect
 	github.com/gobwas/pool v0.2.0 // indirect
+	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/klauspost/compress v1.14.4 // indirect

@@ -22,6 +22,7 @@ type SingleFetch struct {
 	SerialID             int
 	InputTemplate        InputTemplate
 	DataSourceIdentifier []byte
+	Info                 *FetchInfo
 }
 
 type PostProcessingConfiguration struct {
@@ -85,6 +86,8 @@ type BatchInput struct {
 	Items  []InputTemplate
 	// If SkipNullItems is set to true, items that render to null will not be included in the batch but skipped
 	SkipNullItems bool
+	// Same as SkipNullItems but for empty objects
+	SkipEmptyObjectItems bool
 	// If SkipErrItems is set to true, items that return an error during rendering will not be included in the batch but skipped
 	// In this case, the error will be swallowed
 	// E.g. if a field is not nullable and the value is null, the item will be skipped
@@ -151,4 +154,8 @@ type FetchConfiguration struct {
 	// This is the case, e.g. when using batching and one sibling is null, resulting in a null value for one batch item
 	// Returning null in this case tells the batch implementation to skip this item
 	SetTemplateOutputToNullOnVariableNull bool
+}
+
+type FetchInfo struct {
+	DataSourceID string
 }
