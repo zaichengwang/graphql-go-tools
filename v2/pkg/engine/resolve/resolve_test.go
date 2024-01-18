@@ -3933,68 +3933,6 @@ func (f *_fakeStream) AwaitIsDone(t *testing.T, timeout time.Duration) {
 		}
 		time.Sleep(time.Millisecond * 10)
 	}
-<<<<<<< HEAD
-=======
-
-	t.Run("should return errors if the upstream data has errors", func(t *testing.T) {
-		c, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		fakeStream := FakeStream(cancel, func(count int) (message string, ok bool) {
-			return `{"errors":[{"message":"Validation error occurred","locations":[{"line":1,"column":1}],"extensions":{"code":"GRAPHQL_VALIDATION_FAILED"}}],"data":null}`, false
-		})
-
-		resolver, plan, out := setup(c, fakeStream)
-
-		ctx := Context{
-			ctx: c,
-		}
-
-		err := resolver.ResolveGraphQLSubscription(&ctx, plan, out)
-		assert.NoError(t, err)
-		assert.Equal(t, 1, len(out.flushed))
-		assert.Equal(t, `{"errors":[{"message":"Validation error occurred","locations":[{"line":1,"column":1}],"extensions":{"code":"GRAPHQL_VALIDATION_FAILED"}}],"data":null}`, out.flushed[0])
-	})
-
-	t.Run("should return an error if the data source has not been defined", func(t *testing.T) {
-		c, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		resolver, plan, out := setup(c, nil)
-
-		ctx := Context{
-			ctx: c,
-		}
-
-		err := resolver.ResolveGraphQLSubscription(&ctx, plan, out)
-		assert.NoError(t, err)
-		assert.Equal(t, 1, len(out.flushed))
-		assert.Equal(t, `{"errors":[{"message":"no data source found"}]}`, out.flushed[0])
-	})
-
-	t.Run("should successfully get result from upstream", func(t *testing.T) {
-		t.Skip("TODO: This test hangs with the race detector enabled")
-		c, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		fakeStream := FakeStream(cancel, func(count int) (message string, ok bool) {
-			return fmt.Sprintf(`{"data":{"counter":%d}}`, count), true
-		})
-
-		resolver, plan, out := setup(c, fakeStream)
-
-		ctx := Context{
-			ctx: c,
-		}
-
-		err := resolver.ResolveGraphQLSubscription(&ctx, plan, out)
-		assert.NoError(t, err)
-		assert.Equal(t, 3, len(out.flushed))
-		assert.Equal(t, `{"data":{"counter":0}}`, out.flushed[0])
-		assert.Equal(t, `{"data":{"counter":1}}`, out.flushed[1])
-		assert.Equal(t, `{"data":{"counter":2}}`, out.flushed[2])
-	})
->>>>>>> e85c1264 (feat: correctly resolve errors with data as null (#678))
 }
 
 func (f *_fakeStream) UniqueRequestID(ctx *Context, input []byte, xxh *xxhash.Digest) (err error) {
