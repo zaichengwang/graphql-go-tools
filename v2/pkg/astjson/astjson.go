@@ -3,6 +3,7 @@ package astjson
 import (
 	"bytes"
 	"fmt"
+	"github.com/wundergraph/graphql-go-tools/v2/internal/pkg/unsafebytes"
 	"io"
 	"strconv"
 	"sync"
@@ -100,7 +101,8 @@ func (j *JSON) arrayElemIndex(elem string) int {
 		return -1
 	}
 	subStr := elem[1 : len(elem)-1]
-	out, err := jsonparser.GetInt(unsafe.Slice(unsafe.StringData(subStr), len(subStr)))
+	a := &unsafebytes.StringToBytes(subStr)[0]
+	out, err := jsonparser.GetInt(unsafe.Slice(a, len(subStr)))
 	if err != nil {
 		return -1
 	}
