@@ -5,6 +5,7 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -32,6 +33,15 @@ var (
 		{"value"},
 	}
 )
+
+type HttpError struct {
+	statusCode int
+	message    string
+}
+
+func (e *HttpError) Error() string {
+	return fmt.Sprintf("HTTP %d: %s", e.statusCode, e.message)
+}
 
 func Do(client *http.Client, ctx context.Context, requestInput []byte, out io.Writer) (err error) {
 
@@ -96,6 +106,12 @@ func Do(client *http.Client, ctx context.Context, requestInput []byte, out io.Wr
 	response, err := client.Do(request)
 	if err != nil {
 		return err
+	}
+	if response.StatusCode >= 400 {
+		return &HttpError{
+			statusCode: response.StatusCode,
+			message:    http.StatusText(response.StatusCode),
+		}
 	}
 	defer response.Body.Close()
 

@@ -86,6 +86,18 @@ func TestHttpClientDo(t *testing.T) {
 		}
 	}
 
+	runTestExpectError := func(ctx context.Context, input []byte, expectedErrorCode int, expectedErrorString string) func(t *testing.T) {
+		return func(t *testing.T) {
+			out := &bytes.Buffer{}
+			err := Do(http.DefaultClient, ctx, input, out)
+			expectedError := &HttpError{
+				statusCode: expectedErrorCode,
+				message:    expectedErrorString,
+			}
+			assert.Errorf(t, err, expectedError.Error())
+		}
+	}
+
 	background := context.Background()
 
 	t.Run("simple get", func(t *testing.T) {
@@ -100,6 +112,36 @@ func TestHttpClientDo(t *testing.T) {
 		input = SetInputMethod(input, []byte("GET"))
 		input = SetInputURL(input, []byte(server.URL))
 		t.Run("net", runTest(background, input, `ok`))
+	})
+
+	t.Run("simple get 5XX error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, err := httputil.DumpRequest(r, true)
+			assert.NoError(t, err)
+			w.WriteHeader(500)
+			_, err = w.Write([]byte("ok"))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+		var input []byte
+		input = SetInputMethod(input, []byte("GET"))
+		input = SetInputURL(input, []byte(server.URL))
+		t.Run("net", runTestExpectError(background, input, 500, http.StatusText(500)))
+	})
+
+	t.Run("simple get 4XX error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_, err := httputil.DumpRequest(r, true)
+			assert.NoError(t, err)
+			w.WriteHeader(401)
+			_, err = w.Write([]byte("ok"))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+		var input []byte
+		input = SetInputMethod(input, []byte("GET"))
+		input = SetInputURL(input, []byte(server.URL))
+		t.Run("net", runTestExpectError(background, input, 401, http.StatusText(401)))
 	})
 
 	t.Run("query params simple", func(t *testing.T) {
