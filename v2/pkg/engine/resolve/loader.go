@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 	"io"
 	"strconv"
 	"strings"
@@ -492,7 +493,7 @@ func (l *Loader) loadSingleFetch(ctx context.Context, fetch *SingleFetch, items 
 		return l.renderErrorsInvalidInput(res.out)
 	}
 	res.err = l.executeSourceLoad(ctx, fetch.DisallowSingleFlight, fetch.DataSource, preparedInput.Bytes(), res.out)
-	return nil
+	return handleNativeHttpError(res.err)
 }
 
 func (l *Loader) loadEntityFetch(ctx context.Context, fetch *EntityFetch, items []int, res *result) error {
@@ -547,7 +548,7 @@ func (l *Loader) loadEntityFetch(ctx context.Context, fetch *EntityFetch, items 
 	}
 
 	res.err = l.executeSourceLoad(ctx, fetch.DisallowSingleFlight, fetch.DataSource, preparedInput.Bytes(), res.out)
-	return nil
+	return handleNativeHttpError(res.err)
 }
 
 func (l *Loader) loadBatchEntityFetch(ctx context.Context, fetch *BatchEntityFetch, items []int, res *result) error {
@@ -643,7 +644,7 @@ WithNextItem:
 	}
 
 	res.err = l.executeSourceLoad(ctx, fetch.DisallowSingleFlight, fetch.DataSource, preparedInput.Bytes(), res.out)
-	return nil
+	return handleNativeHttpError(res.err)
 }
 
 func (l *Loader) executeSourceLoad(ctx context.Context, disallowSingleFlight bool, source DataSource, input []byte, out io.Writer) error {
@@ -673,4 +674,13 @@ func (l *Loader) executeSourceLoad(ctx context.Context, disallowSingleFlight boo
 
 func (r *result) init(postProcessing PostProcessingConfiguration) {
 	r.postProcessing = postProcessing
+}
+
+func handleNativeHttpError(err error) error {
+	var httpError *httpclient.HttpError
+	// we only bubble up 4XX error
+	if errors.As(err, &httpError) && httpError.StatusCode >= 400 && httpError.StatusCode < 500 {
+		return err
+	}
+	return nil
 }
