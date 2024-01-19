@@ -91,8 +91,8 @@ func TestHttpClientDo(t *testing.T) {
 			out := &bytes.Buffer{}
 			err := Do(http.DefaultClient, ctx, input, out)
 			expectedError := &HttpError{
-				statusCode: expectedErrorCode,
-				message:    expectedErrorString,
+				StatusCode: expectedErrorCode,
+				Message:    expectedErrorString,
 			}
 			assert.Errorf(t, err, expectedError.Error())
 		}

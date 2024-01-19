@@ -3,7 +3,9 @@ package resolve
 import (
 	"bytes"
 	"context"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 	"io"
+	"net/http"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -32,6 +34,24 @@ func mockedDS(t TestingTB, ctrl *gomock.Controller, expectedInput, responseData 
 			pair.Data.WriteString(responseData)
 
 			return writeGraphqlResponse(pair, w, false)
+		}).AnyTimes()
+	return service
+}
+
+func mockedDSWithHttpError(t TestingTB, ctrl *gomock.Controller, expectedInput string, errorCode int) *MockDataSource {
+	t.Helper()
+	service := NewMockDataSource(ctrl)
+	service.EXPECT().
+		Load(gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(&bytes.Buffer{})).
+		DoAndReturn(func(ctx context.Context, input []byte, w io.Writer) (err error) {
+			actual := string(input)
+			expected := expectedInput
+			require.Equal(t, expected, actual)
+
+			return &httpclient.HttpError{
+				StatusCode: errorCode,
+				Message:    http.StatusText(errorCode),
+			}
 		}).AnyTimes()
 	return service
 }

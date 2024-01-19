@@ -35,12 +35,12 @@ var (
 )
 
 type HttpError struct {
-	statusCode int
-	message    string
+	StatusCode int
+	Message    string
 }
 
 func (e *HttpError) Error() string {
-	return fmt.Sprintf("HTTP %d: %s", e.statusCode, e.message)
+	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Message)
 }
 
 func Do(client *http.Client, ctx context.Context, requestInput []byte, out io.Writer) (err error) {
@@ -109,8 +109,8 @@ func Do(client *http.Client, ctx context.Context, requestInput []byte, out io.Wr
 	}
 	if response.StatusCode >= 400 {
 		return &HttpError{
-			statusCode: response.StatusCode,
-			message:    http.StatusText(response.StatusCode),
+			StatusCode: response.StatusCode,
+			Message:    http.StatusText(response.StatusCode),
 		}
 	}
 	defer response.Body.Close()
