@@ -5,7 +5,6 @@ import (
 	"compress/flate"
 	"compress/gzip"
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -33,15 +32,6 @@ var (
 		{"value"},
 	}
 )
-
-type HttpError struct {
-	StatusCode int
-	Message    string
-}
-
-func (e *HttpError) Error() string {
-	return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Message)
-}
 
 func Do(client *http.Client, ctx context.Context, requestInput []byte, out io.Writer) (err error) {
 
