@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
-	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 	"io"
 	"strings"
 	"unsafe"
@@ -487,10 +486,10 @@ func (l *Loader) loadSingleFetch(ctx context.Context, fetch *SingleFetch, items 
 		return l.renderErrorsInvalidInput(res.out)
 	}
 	res.err = l.executeSourceLoad(ctx, fetch.DisallowSingleFlight, fetch.DataSource, preparedInput.Bytes(), res.out)
-	var httpError *httpclient.HttpError
-	if errors.As(res.err, &httpError) {
-		return res.err
-	}
+	//var httpError *httpclient.HttpError
+	//if errors.As(res.err, &httpError) {
+	//	return res.err
+	//}
 	return nil
 }
 
@@ -546,10 +545,10 @@ func (l *Loader) loadEntityFetch(ctx context.Context, fetch *EntityFetch, items 
 	}
 
 	res.err = l.executeSourceLoad(ctx, fetch.DisallowSingleFlight, fetch.DataSource, preparedInput.Bytes(), res.out)
-	var httpError *httpclient.HttpError
-	if errors.As(res.err, &httpError) {
-		return res.err
-	}
+	//var httpError *httpclient.HttpError
+	//if errors.As(res.err, &httpError) {
+	//	return res.err
+	//}
 	return nil
 }
 
@@ -646,10 +645,10 @@ WithNextItem:
 	}
 
 	res.err = l.executeSourceLoad(ctx, fetch.DisallowSingleFlight, fetch.DataSource, preparedInput.Bytes(), res.out)
-	var httpError *httpclient.HttpError
-	if errors.As(res.err, &httpError) {
-		return res.err
-	}
+	//var httpError *httpclient.HttpError
+	//if errors.As(res.err, &httpError) {
+	//	return res.err
+	//}
 	return nil
 }
 
