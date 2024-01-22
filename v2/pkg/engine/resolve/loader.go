@@ -433,13 +433,13 @@ func (l *Loader) renderErrorsFailedToFetch(res *result) error {
 	path := l.renderPath()
 	l.ctx.appendSubgraphError(errors.Wrap(res.err, fmt.Sprintf("failed to fetch from subgraph '%s' at path '%s'", res.subgraphName, path)))
 	if res.subgraphName == "" {
-		errorObject, err := l.data.AppendObject([]byte(fmt.Sprintf(`{"message":"Failed to fetch from Subgraph at path '%s'."}`, path)))
+		errorObject, err := l.data.AppendObject([]byte(fmt.Sprintf(`{"message":"Failed to fetch from Subgraph at path '%s', '%s'."}`, path, res.err.Error())))
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		l.data.Nodes[l.errorsRoot].ArrayValues = append(l.data.Nodes[l.errorsRoot].ArrayValues, errorObject)
 	} else {
-		errorObject, err := l.data.AppendObject([]byte(fmt.Sprintf(`{"message":"Failed to fetch from Subgraph '%s' at path '%s'."}`, res.subgraphName, path)))
+		errorObject, err := l.data.AppendObject([]byte(fmt.Sprintf(`{"message":"Failed to fetch from Subgraph '%s' at path '%s', '%s'."}`, res.subgraphName, path, res.err.Error())))
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -486,10 +486,6 @@ func (l *Loader) loadSingleFetch(ctx context.Context, fetch *SingleFetch, items 
 		return l.renderErrorsInvalidInput(res.out)
 	}
 	res.err = l.executeSourceLoad(ctx, fetch.DisallowSingleFlight, fetch.DataSource, preparedInput.Bytes(), res.out)
-	//var httpError *httpclient.HttpError
-	//if errors.As(res.err, &httpError) {
-	//	return res.err
-	//}
 	return nil
 }
 
@@ -545,10 +541,6 @@ func (l *Loader) loadEntityFetch(ctx context.Context, fetch *EntityFetch, items 
 	}
 
 	res.err = l.executeSourceLoad(ctx, fetch.DisallowSingleFlight, fetch.DataSource, preparedInput.Bytes(), res.out)
-	//var httpError *httpclient.HttpError
-	//if errors.As(res.err, &httpError) {
-	//	return res.err
-	//}
 	return nil
 }
 
@@ -645,10 +637,6 @@ WithNextItem:
 	}
 
 	res.err = l.executeSourceLoad(ctx, fetch.DisallowSingleFlight, fetch.DataSource, preparedInput.Bytes(), res.out)
-	//var httpError *httpclient.HttpError
-	//if errors.As(res.err, &httpError) {
-	//	return res.err
-	//}
 	return nil
 }
 

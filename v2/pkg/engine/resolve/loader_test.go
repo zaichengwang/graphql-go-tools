@@ -3,8 +3,6 @@ package resolve
 import (
 	"bytes"
 	"context"
-	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
-	"net/http"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -580,13 +578,13 @@ func TestV2Loader_LoadGraphQLResponseDataWithHttpError(t *testing.T) {
 	err := resolvable.Init(ctx, nil, ast.OperationTypeQuery)
 	assert.NoError(t, err)
 	err = loader.LoadGraphQLResponseData(ctx, response, resolvable)
-
-	expectedError := &httpclient.HttpError{
-		StatusCode: 500,
-		Message:    http.StatusText(500),
-	}
-	assert.Errorf(t, err, expectedError.Error())
+	assert.NoError(t, err)
 	ctrl.Finish()
+	out := &bytes.Buffer{}
+	err = resolvable.storage.PrintNode(resolvable.storage.Nodes[resolvable.storage.RootNode], out)
+	assert.NoError(t, err)
+	expected := `{"errors":[{"message":"Failed to fetch from Subgraph at path '', 'HTTP 500: Internal Server Error'."}],"data":{}}`
+	assert.Equal(t, expected, out.String())
 }
 
 func BenchmarkV2Loader_LoadGraphQLResponseData(b *testing.B) {
