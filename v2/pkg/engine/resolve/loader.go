@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"io"
+	"strconv"
 	"strings"
 	"unsafe"
 
@@ -432,14 +433,19 @@ func (l *Loader) renderErrorsInvalidInput(out *bytes.Buffer) error {
 func (l *Loader) renderErrorsFailedToFetch(res *result) error {
 	path := l.renderPath()
 	l.ctx.appendSubgraphError(errors.Wrap(res.err, fmt.Sprintf("failed to fetch from subgraph '%s' at path '%s'", res.subgraphName, path)))
+	escapedErrMsg := strconv.QuoteToASCII(res.err.Error())
 	if res.subgraphName == "" {
-		errorObject, err := l.data.AppendObject([]byte(fmt.Sprintf(`{"message":"Failed to fetch from Subgraph at path '%s', '%s'."}`, path, res.err.Error())))
+		errorMsg := strconv.Quote(fmt.Sprintf(`Failed to fetch from Subgraph at path '%s', '%s'.`, path, escapedErrMsg))
+		errorObject, err := l.data.AppendObject([]byte(
+			fmt.Sprintf(`{"message":%s}`, errorMsg)))
 		if err != nil {
 			return errors.WithStack(err)
 		}
 		l.data.Nodes[l.errorsRoot].ArrayValues = append(l.data.Nodes[l.errorsRoot].ArrayValues, errorObject)
 	} else {
-		errorObject, err := l.data.AppendObject([]byte(fmt.Sprintf(`{"message":"Failed to fetch from Subgraph '%s' at path '%s', '%s'."}`, res.subgraphName, path, res.err.Error())))
+		errorMsg := strconv.Quote(fmt.Sprintf(`Failed to fetch from Subgraph '%s' at path '%s', '%s'.`, res.subgraphName, path, escapedErrMsg))
+		errorObject, err := l.data.AppendObject([]byte(
+			fmt.Sprintf(`{"message":%s}`, errorMsg)))
 		if err != nil {
 			return errors.WithStack(err)
 		}
