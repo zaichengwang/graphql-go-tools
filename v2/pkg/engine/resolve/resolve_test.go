@@ -1718,7 +1718,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 					},
 				},
 			},
-		}, Context{ctx: context.Background()}, `{"errors":[{"message":"Failed to fetch from Subgraph at path 'query'."}],"data":null}`
+		}, Context{ctx: context.Background()}, `{"errors":[{"message":"Failed to fetch from Subgraph at path 'query', '\"\"'."}],"data":null}`
 	}))
 	t.Run("fetch with returned err", testFn(true, func(t *testing.T, ctrl *gomock.Controller) (node *GraphQLResponse, ctx Context, expectedOutput string) {
 		mockDataSource := NewMockDataSource(ctrl)
@@ -1748,7 +1748,7 @@ func TestResolver_ResolveGraphQLResponse(t *testing.T) {
 					},
 				},
 			},
-		}, Context{ctx: context.Background()}, `{"errors":[{"message":"Failed to fetch from Subgraph at path 'query'."}],"data":null}`
+		}, Context{ctx: context.Background()}, `{"errors":[{"message":"Failed to fetch from Subgraph at path 'query', '\"\"'."}],"data":null}`
 	}))
 	t.Run("fetch with two Errors", testFn(true, func(t *testing.T, ctrl *gomock.Controller) (node *GraphQLResponse, ctx Context, expectedOutput string) {
 		mockDataSource := NewMockDataSource(ctrl)
