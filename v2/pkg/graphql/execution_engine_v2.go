@@ -296,7 +296,9 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 	return err
 }
 func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operation, definition *ast.Document, operationName string, report *operationreport.Report) plan.Plan {
+	traceId := ""
 
+	startTime := time.Now().UnixNano()
 	hash := pool.Hash64.Get()
 	hash.Reset()
 	defer pool.Hash64.Put(hash)
@@ -313,16 +315,25 @@ func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operati
 			return p
 		}
 	}
+	endTime := time.Now().UnixNano()
+	fmt.Println("TraceID:", traceId, "GetCachedPlanPart1Time:", endTime-startTime)
 
+	startTime = time.Now().UnixNano()
 	e.plannerMu.Lock()
 	defer e.plannerMu.Unlock()
 	planResult := e.planner.Plan(operation, definition, operationName, report)
+	endTime = time.Now().UnixNano()
+	fmt.Println("TraceID:", traceId, "Plan Time:", endTime-startTime)
+	startTime = time.Now().UnixNano()
 	if report.HasErrors() {
 		return nil
 	}
 
 	p := ctx.postProcessor.Process(planResult)
 	e.executionPlanCache.Add(cacheKey, p)
+	endTime = time.Now().UnixNano()
+	fmt.Println("TraceID:", traceId, "GetCachedPlanPart2Time:", endTime-startTime)
+
 	return p
 }
 

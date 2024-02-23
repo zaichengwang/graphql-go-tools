@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astprinter"
@@ -128,19 +129,26 @@ func (p *Planner) Plan(operation, definition *ast.Document, operationName string
 			}
 		}
 
+		startTime := time.Now().UnixNano()
+
 		err := p.planningVisitor.planners[key].planner.Register(p.planningVisitor, dataSourceConfig, dataSourcePlannerConfig)
 		if err != nil {
 			report.AddInternalError(err)
 			return
 		}
+
+		endTime := time.Now().UnixNano()
+		fmt.Println("RegisterTime:", endTime-startTime)
 	}
 
 	// process the plan
-
+	startTime := time.Now().UnixNano()
 	p.planningWalker.Walk(operation, definition, report)
 	if report.HasErrors() {
 		return
 	}
+	endTime := time.Now().UnixNano()
+	fmt.Println("WalkTime:", endTime-startTime)
 
 	return p.planningVisitor.plan
 }
