@@ -23,7 +23,6 @@ import (
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/plan"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/resolve"
-	"github.com/wundergraph/graphql-go-tools/v2/pkg/federation"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/lexer/literal"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
 )
@@ -273,9 +272,10 @@ func ConfigJson(config Configuration) json.RawMessage {
 }
 
 type FederationConfiguration struct {
-	Enabled    bool
-	ServiceSDL string
-	UnionTypes []string
+	Enabled          bool
+	ServiceSDL       string
+	UnionTypes       []string
+	FederationSchema string
 }
 
 type SubscriptionConfiguration struct {
@@ -1329,8 +1329,7 @@ func (p *Planner) printOperation() []byte {
 	}
 
 	if p.config.Federation.Enabled {
-		federationSchema, err := federation.BuildFederationSchemaWithKnownUnionTypes(p.config.UpstreamSchema,
-			p.config.Federation.ServiceSDL, p.config.Federation.UnionTypes)
+		federationSchema := p.config.Federation.FederationSchema
 		if err != nil {
 			p.visitor.Walker.StopWithInternalErr(err)
 			return nil
