@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/buger/jsonparser"
 	"github.com/jensneuse/abstractlogger"
@@ -322,7 +323,10 @@ func (p *Planner) Register(visitor *plan.Visitor, configuration plan.DataSourceC
 func (p *Planner) ConfigureFetch() resolve.FetchConfiguration {
 	var input []byte
 	input = httpclient.SetInputBodyWithPath(input, p.upstreamVariables, "variables")
+	start := time.Now()
 	input = httpclient.SetInputBodyWithPath(input, p.printOperation(), "query")
+	elapsed := time.Since(start)
+	fmt.Println("Elapsed time for print:", elapsed)
 
 	if p.unnulVariables {
 		input = httpclient.SetInputFlag(input, httpclient.UNNULLVARIABLES)
