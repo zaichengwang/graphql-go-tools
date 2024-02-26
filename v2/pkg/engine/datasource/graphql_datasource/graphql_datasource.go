@@ -275,6 +275,7 @@ func ConfigJson(config Configuration) json.RawMessage {
 type FederationConfiguration struct {
 	Enabled    bool
 	ServiceSDL string
+	UnionTypes []string
 }
 
 type SubscriptionConfiguration struct {
@@ -1328,7 +1329,8 @@ func (p *Planner) printOperation() []byte {
 	}
 
 	if p.config.Federation.Enabled {
-		federationSchema, err := federation.BuildFederationSchema(p.config.UpstreamSchema, p.config.Federation.ServiceSDL)
+		federationSchema, err := federation.BuildFederationSchemaWithKnownUnionTypes(p.config.UpstreamSchema,
+			p.config.Federation.ServiceSDL, p.config.Federation.UnionTypes)
 		if err != nil {
 			p.visitor.Walker.StopWithInternalErr(err)
 			return nil

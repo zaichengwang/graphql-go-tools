@@ -22,6 +22,11 @@ func BuildFederationSchema(baseSchema, serviceSDL string) (string, error) {
 	return builder.buildFederationSchema(baseSchema, serviceSDL)
 }
 
+func BuildFederationSchemaWithKnownUnionTypes(baseSchema, serviceSDL string, unionTypes []string) (string, error) {
+	builder := schemaBuilder{}
+	return builder.buildFederationSchemaWithUnionTypes(baseSchema, serviceSDL, unionTypes)
+}
+
 func EntityUnionTypes(serviceSDL string) []string {
 	builder := schemaBuilder{}
 	return builder.entityUnionTypes(serviceSDL)
@@ -34,6 +39,10 @@ type schemaBuilder struct {
 // BuildFederationSchema takes a baseSchema plus the service sdl and turns it into a fully compliant federation schema
 func (s *schemaBuilder) buildFederationSchema(baseSchema, serviceSDL string) (string, error) {
 	unionTypes := s.entityUnionTypes(serviceSDL)
+	return s.buildFederationSchemaWithUnionTypes(baseSchema, serviceSDL, unionTypes)
+}
+
+func (s *schemaBuilder) buildFederationSchemaWithUnionTypes(baseSchema, serviceSDL string, unionTypes []string) (string, error) {
 	hasEntities := len(unionTypes) != 0
 
 	federatedSchema := federationTemplate
