@@ -22,6 +22,11 @@ func BuildFederationSchema(baseSchema, serviceSDL string) (string, error) {
 	return builder.buildFederationSchema(baseSchema, serviceSDL)
 }
 
+func EntityUnionTypes(serviceSDL string) []string {
+	builder := schemaBuilder{}
+	return builder.entityUnionTypes(serviceSDL)
+}
+
 // schemaBuilder makes GraphQL schemas compliant with the Apollo Federation Specification
 type schemaBuilder struct {
 }
