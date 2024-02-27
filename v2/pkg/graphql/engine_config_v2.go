@@ -31,16 +31,6 @@ func NewEngineV2Configuration(schema *Schema) EngineV2Configuration {
 			DefaultFlushIntervalMillis: DefaultFlushIntervalInMilliseconds,
 			DataSources:                []plan.DataSourceConfiguration{},
 			Fields:                     plan.FieldConfigurations{},
-			Debug: plan.DebugConfiguration{
-				PrintOperationTransformations: true,
-				PrintOperationEnableASTRefs:   true,
-				PrintPlanningPaths:            true,
-				PrintQueryPlans:               true,
-				PrintNodeSuggestions:          true,
-				ConfigurationVisitor:          true,
-				PlanningVisitor:               true,
-				DatasourceVisitor:             true,
-			},
 		},
 		dataLoaderConfig: dataLoaderConfig{
 			EnableSingleFlightLoader: false,
