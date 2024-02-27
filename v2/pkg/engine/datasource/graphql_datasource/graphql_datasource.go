@@ -277,7 +277,6 @@ type FederationConfiguration struct {
 	ServiceSDL       string
 	UnionTypes       []string
 	FederationSchema string
-	Document         ast.Document
 }
 
 type SubscriptionConfiguration struct {
@@ -1313,7 +1312,7 @@ func (p *Planner) printOperation() []byte {
 
 	// create empty operation and definition documents
 	operation := ast.NewDocument()
-	definition := &p.config.Federation.Document
+	definition := &p.dataSourceConfig.ParsedDocument
 	report := &operationreport.Report{}
 	operationParser := astparser.NewParser()
 	definitionParser := astparser.NewParser()
@@ -1337,12 +1336,12 @@ func (p *Planner) printOperation() []byte {
 	}
 
 	if p.config.Federation.Enabled {
-		federationSchema := p.config.Federation.FederationSchema
-		if err != nil {
-			p.visitor.Walker.StopWithInternalErr(err)
-			return nil
-		}
-		definition.Input.ResetInputString(federationSchema)
+		//federationSchema := p.config.Federation.FederationSchema
+		//if err != nil {
+		//	p.visitor.Walker.StopWithInternalErr(err)
+		//	return nil
+		//}
+		//definition.Input.ResetInputString(federationSchema)
 		//start := time.Now()
 		//definitionParser.Parse(definition, report)
 		//elapsed := time.Since(start)
