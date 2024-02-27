@@ -3,10 +3,8 @@ package ast
 import (
 	"bytes"
 	"fmt"
-	"log"
-	"time"
-
 	"github.com/wundergraph/graphql-go-tools/v2/internal/pkg/unsafebytes"
+	"log"
 )
 
 type Node struct {
@@ -314,16 +312,11 @@ func (d *Document) NodeInputFieldDefinitionByName(node Node, name ByteSlice) (in
 }
 
 func (d *Document) NodeFieldDefinitionByName(node Node, fieldName ByteSlice) (definition int, exists bool) {
-	startTime := time.Now().UnixNano()
-	for index, i := range d.NodeFieldDefinitions(node) {
+	for _, i := range d.NodeFieldDefinitions(node) {
 		if bytes.Equal(d.Input.ByteSlice(d.FieldDefinitions[i].Name), fieldName) {
-			endTime := time.Now().UnixNano()
-			fmt.Printf("NodeFieldDefinitionByName took %d nanoseconds, index: %d\n", endTime-startTime, index)
 			return i, true
 		}
 	}
-	endTime := time.Now().UnixNano()
-	fmt.Printf("NodeFieldDefinitionByName took %d nanoseconds\n", endTime-startTime)
 	return InvalidRef, false
 }
 

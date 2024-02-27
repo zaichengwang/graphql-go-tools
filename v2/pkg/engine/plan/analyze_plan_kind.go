@@ -1,11 +1,9 @@
 package plan
 
 import (
-	"fmt"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astvisitor"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
-	"time"
 )
 
 func AnalyzePlanKind(operation, definition *ast.Document, operationName string) (operationType ast.OperationType, streaming bool, error error) {
@@ -20,11 +18,8 @@ func AnalyzePlanKind(operation, definition *ast.Document, operationName string) 
 	walker.RegisterEnterDirectiveVisitor(visitor)
 
 	var report operationreport.Report
-	startTime := time.Now().UnixNano()
 	walker.Walk(operation, definition, &report)
-	endTime := time.Now().UnixNano()
 
-	fmt.Println("walker from analyze plan kind:", endTime-startTime)
 	if report.HasErrors() {
 		return ast.OperationTypeUnknown, false, report
 	}

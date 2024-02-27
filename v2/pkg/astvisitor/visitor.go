@@ -3,11 +3,6 @@ package astvisitor
 import (
 	"bytes"
 	"fmt"
-	"log"
-	"runtime"
-	"strings"
-	"time"
-
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/lexer/literal"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
@@ -1352,25 +1347,7 @@ func (w *Walker) Walk(document, definition *ast.Document, report *operationrepor
 	w.definition = definition
 	w.Depth = 0
 	w.stop = false
-	startTime := time.Now()
 	w.walk()
-	duration := time.Since(startTime)
-
-	pc := make([]uintptr, 5) // at least 1 entry needed
-	n := runtime.Callers(2, pc)
-	frames := runtime.CallersFrames(pc[:n])
-	stack := []string{}
-	for {
-		frame, more := frames.Next()
-		stack = append(stack, frame.Function)
-		if !more {
-			break
-		}
-	}
-
-	toPrint := strings.Join(stack, "/")
-
-	log.Printf("!!!!!!!!!! Walker %s walk function took %s", toPrint, duration)
 }
 
 // DefferOnEnterField runs the provided func() after the current batch of visitors
