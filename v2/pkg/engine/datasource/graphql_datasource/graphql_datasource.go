@@ -1325,7 +1325,10 @@ func (p *Planner) printOperation() []byte {
 	}
 
 	if p.config.UpstreamSchema == "" {
+		start := time.Now()
 		p.config.UpstreamSchema, err = astprinter.PrintString(p.visitor.Definition, nil)
+		elapsed := time.Since(start)
+		fmt.Println("Elapsed time set upstream schema:", elapsed)
 		if err != nil {
 			p.visitor.Walker.StopWithInternalErr(err)
 			return nil
@@ -1339,7 +1342,10 @@ func (p *Planner) printOperation() []byte {
 			return nil
 		}
 		definition.Input.ResetInputString(federationSchema)
+		start := time.Now()
 		definitionParser.Parse(definition, report)
+		elapsed := time.Since(start)
+		fmt.Println("definitionParser Elapsed time:", elapsed)
 		if report.HasErrors() {
 			p.stopWithError(parseDocumentFailedErrMsg, "definition")
 			return nil
