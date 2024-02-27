@@ -3,6 +3,7 @@ package http
 
 import (
 	"bytes"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
 	"net/http"
 
 	log "github.com/jensneuse/abstractlogger"
@@ -27,7 +28,8 @@ func (g *GraphQLHTTPRequestHandler) handleHTTP(w http.ResponseWriter, r *http.Re
 
 	buf := bytes.NewBuffer(make([]byte, 0, 4096))
 	resultWriter := graphql.NewEngineResultWriterFromBuffer(buf)
-	if err = g.engine.Execute(r.Context(), &gqlRequest, &resultWriter); err != nil {
+	pr := operationreport.PerformanceReport{}
+	if err = g.engine.Execute(r.Context(), &gqlRequest, &resultWriter, &pr); err != nil {
 		g.log.Error("engine.Execute", log.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
