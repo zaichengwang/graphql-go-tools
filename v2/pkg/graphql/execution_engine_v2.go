@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/jensneuse/abstractlogger"
@@ -226,7 +227,11 @@ func NewExecutionEngineV2(ctx context.Context, logger abstractlogger.Logger, eng
 	}, nil
 }
 
-func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, writer resolve.FlushWriter, options ...ExecutionOptionsV2) error {
+func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, writer resolve.FlushWriter,
+	performanceReport *operationreport.PerformanceReport,
+	options ...ExecutionOptionsV2) error {
+	startTime := time.Now().UnixNano()
+
 	if !operation.IsNormalized() {
 		result, err := operation.Normalize(e.config.schema)
 		if err != nil {
@@ -246,6 +251,9 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 		return result.Errors
 	}
 
+	endTime := time.Now().UnixNano()
+	performanceReport.SchemaValidationTime = endTime - startTime
+
 	execContext := e.getExecutionCtx()
 	defer e.putExecutionCtx(execContext)
 
@@ -256,16 +264,28 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 	}
 
 	var report operationreport.Report
-	cachedPlan := e.getCachedPlan(execContext, &operation.document, &e.config.schema.document, operation.OperationName, &report)
+	startTime = time.Now().UnixNano()
+
+	cachedPlan := e.getCachedPlan(execContext, &operation.document, &e.config.schema.document,
+		operation.OperationName, &report, performanceReport)
+
+	endTime = time.Now().UnixNano()
+	performanceReport.PlanTime = endTime - startTime
+
 	if report.HasErrors() {
 		return report
 	}
 
+	startTime = time.Now().UnixNano()
 	switch p := cachedPlan.(type) {
 	case *plan.SynchronousResponsePlan:
 		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer)
+		endTime = time.Now().UnixNano()
+		performanceReport.ResolveResponseTime = endTime - startTime
 	case *plan.SubscriptionResponsePlan:
 		err = e.resolver.ResolveGraphQLSubscription(execContext.resolveContext, p.Response, writer)
+		endTime = time.Now().UnixNano()
+		performanceReport.ResolveResponseTime = endTime - startTime
 	default:
 		return errors.New("execution of operation is not possible")
 	}
@@ -273,7 +293,8 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 	return err
 }
 
-func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operation, definition *ast.Document, operationName string, report *operationreport.Report) plan.Plan {
+func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operation, definition *ast.Document, operationName string,
+	report *operationreport.Report, performanceReport *operationreport.PerformanceReport) plan.Plan {
 
 	hash := pool.Hash64.Get()
 	hash.Reset()
@@ -288,9 +309,11 @@ func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operati
 
 	if cached, ok := e.executionPlanCache.Get(cacheKey); ok {
 		if p, ok := cached.(plan.Plan); ok {
+			performanceReport.IsUsingCachedPlan = true
 			return p
 		}
 	}
+	performanceReport.IsUsingCachedPlan = false
 
 	e.plannerMu.Lock()
 	defer e.plannerMu.Unlock()

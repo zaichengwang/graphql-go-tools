@@ -5,6 +5,7 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
 	"testing"
 	"time"
 
@@ -46,6 +47,8 @@ func TestExecutionEngineV2_FederationAndSubscription_IntegrationTest(t *testing.
 				Query:         federationtesting.QueryReviewsOfMe,
 			}
 
+			pr := operationreport.PerformanceReport{}
+
 			validationResult, err := gqlRequest.ValidateForSchema(schema)
 			require.NoError(t, err)
 			require.True(t, validationResult.Valid)
@@ -54,7 +57,7 @@ func TestExecutionEngineV2_FederationAndSubscription_IntegrationTest(t *testing.
 			defer execCtxCancelFn()
 
 			resultWriter := NewEngineResultWriter()
-			err = engine.Execute(execCtx, gqlRequest, &resultWriter)
+			err = engine.Execute(execCtx, gqlRequest, &resultWriter, &pr)
 			if assert.NoError(t, err) {
 				assert.Equal(t,
 					`{"data":{"me":{"reviews":[{"body":"A highly effective form of birth control.","product":{"upc":"top-1","name":"Trilby","price":11}},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits.","product":{"upc":"top-2","name":"Fedora","price":22}}]}}}`,
@@ -99,7 +102,8 @@ subscription UpdatedPrice {
 			})
 
 			go func() {
-				err := engine.Execute(execCtx, gqlRequest, &resultWriter)
+				pr := operationreport.PerformanceReport{}
+				err := engine.Execute(execCtx, gqlRequest, &resultWriter, &pr)
 				assert.NoError(t, err)
 			}()
 

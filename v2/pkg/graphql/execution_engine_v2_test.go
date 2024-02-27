@@ -204,7 +204,8 @@ func TestExecutionEngineV2_Execute(t *testing.T) {
 			resultWriter := NewEngineResultWriter()
 			execCtx, execCtxCancel := context.WithCancel(context.Background())
 			defer execCtxCancel()
-			err = engine.Execute(execCtx, &operation, &resultWriter, testCase.engineOptions...)
+			pr := operationreport.PerformanceReport{}
+			err = engine.Execute(execCtx, &operation, &resultWriter, &pr, testCase.engineOptions...)
 			actualResponse := resultWriter.String()
 			assert.Equal(t, testCase.expectedResponse, actualResponse)
 
@@ -1311,7 +1312,8 @@ func TestExecutionWithOptions(t *testing.T) {
 
 	operation := testCase.operation(t)
 	resultWriter := NewEngineResultWriter()
-	err = engine.Execute(context.Background(), &operation, &resultWriter, WithBeforeFetchHook(before), WithAfterFetchHook(after))
+	pr := operationreport.PerformanceReport{}
+	err = engine.Execute(context.Background(), &operation, &resultWriter, &pr, WithBeforeFetchHook(before), WithAfterFetchHook(after))
 
 	assert.Equal(t, `{"method":"GET","url":"https://example.com/","body":{"query":"{hero {name}}"}}`, before.input)
 	assert.Equal(t, `{"hero":{"name":"Luke Skywalker"}}`, after.data)
@@ -1388,7 +1390,8 @@ func TestExecutionEngineV2_GetCachedPlan(t *testing.T) {
 		}
 
 		report := operationreport.Report{}
-		cachedPlan := engine.getCachedPlan(firstInternalExecCtx, &gqlRequest.document, &schema.document, gqlRequest.OperationName, &report)
+		pr := operationreport.PerformanceReport{}
+		cachedPlan := engine.getCachedPlan(firstInternalExecCtx, &gqlRequest.document, &schema.document, gqlRequest.OperationName, &report, &pr)
 		_, oldestCachedPlan, _ := engine.executionPlanCache.GetOldest()
 		assert.False(t, report.HasErrors())
 		assert.Equal(t, 1, engine.executionPlanCache.Len())
@@ -1399,7 +1402,8 @@ func TestExecutionEngineV2_GetCachedPlan(t *testing.T) {
 			http.CanonicalHeaderKey("Authorization"): []string{"123abc"},
 		}
 
-		cachedPlan = engine.getCachedPlan(secondInternalExecCtx, &gqlRequest.document, &schema.document, gqlRequest.OperationName, &report)
+		pr = operationreport.PerformanceReport{}
+		cachedPlan = engine.getCachedPlan(secondInternalExecCtx, &gqlRequest.document, &schema.document, gqlRequest.OperationName, &report, &pr)
 		_, oldestCachedPlan, _ = engine.executionPlanCache.GetOldest()
 		assert.False(t, report.HasErrors())
 		assert.Equal(t, 1, engine.executionPlanCache.Len())
@@ -1416,7 +1420,8 @@ func TestExecutionEngineV2_GetCachedPlan(t *testing.T) {
 		}
 
 		report := operationreport.Report{}
-		cachedPlan := engine.getCachedPlan(firstInternalExecCtx, &gqlRequest.document, &schema.document, gqlRequest.OperationName, &report)
+		pr := operationreport.PerformanceReport{}
+		cachedPlan := engine.getCachedPlan(firstInternalExecCtx, &gqlRequest.document, &schema.document, gqlRequest.OperationName, &report, &pr)
 		_, oldestCachedPlan, _ := engine.executionPlanCache.GetOldest()
 		assert.False(t, report.HasErrors())
 		assert.Equal(t, 1, engine.executionPlanCache.Len())
@@ -1427,7 +1432,8 @@ func TestExecutionEngineV2_GetCachedPlan(t *testing.T) {
 			http.CanonicalHeaderKey("Authorization"): []string{"xyz098"},
 		}
 
-		cachedPlan = engine.getCachedPlan(secondInternalExecCtx, &differentGqlRequest.document, &schema.document, differentGqlRequest.OperationName, &report)
+		pr = operationreport.PerformanceReport{}
+		cachedPlan = engine.getCachedPlan(secondInternalExecCtx, &differentGqlRequest.document, &schema.document, differentGqlRequest.OperationName, &report, &pr)
 		_, oldestCachedPlan, _ = engine.executionPlanCache.GetOldest()
 		assert.False(t, report.HasErrors())
 		assert.Equal(t, 2, engine.executionPlanCache.Len())
@@ -1469,7 +1475,8 @@ func BenchmarkIntrospection(b *testing.B) {
 
 	writer := NewEngineResultWriter()
 	engine := newEngine()
-	require.NoError(b, engine.Execute(ctx, &req, &writer))
+	pr := operationreport.PerformanceReport{}
+	require.NoError(b, engine.Execute(ctx, &req, &writer, &pr))
 	require.Equal(b, expectedResponse, writer.Bytes())
 
 	pool := sync.Pool{
@@ -1486,7 +1493,8 @@ func BenchmarkIntrospection(b *testing.B) {
 		for pb.Next() {
 			bc := pool.Get().(*benchCase)
 			bc.writer.Reset()
-			require.NoError(b, bc.engine.Execute(ctx, &req, bc.writer))
+			pr := operationreport.PerformanceReport{}
+			require.NoError(b, bc.engine.Execute(ctx, &req, bc.writer, &pr))
 			if !bytes.Equal(expectedResponse, bc.writer.Bytes()) {
 				require.Equal(b, string(expectedResponse), bc.writer.String())
 			}
@@ -1551,7 +1559,8 @@ func BenchmarkExecutionEngineV2(b *testing.B) {
 
 	writer := NewEngineResultWriter()
 	engine := newEngine()
-	require.NoError(b, engine.Execute(ctx, &req, &writer))
+	pr := operationreport.PerformanceReport{}
+	require.NoError(b, engine.Execute(ctx, &req, &writer, &pr))
 	require.Equal(b, "{\"data\":{\"hello\":\"world\"}}", writer.String())
 
 	pool := sync.Pool{
@@ -1568,7 +1577,8 @@ func BenchmarkExecutionEngineV2(b *testing.B) {
 		for pb.Next() {
 			bc := pool.Get().(*benchCase)
 			bc.writer.Reset()
-			_ = bc.engine.Execute(ctx, &req, bc.writer)
+			pr := operationreport.PerformanceReport{}
+			_ = bc.engine.Execute(ctx, &req, bc.writer, &pr)
 			pool.Put(bc)
 		}
 	})
