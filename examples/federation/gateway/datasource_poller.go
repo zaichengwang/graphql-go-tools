@@ -16,9 +16,9 @@ import (
 )
 
 type ServiceConfig struct {
-	Name string
-	URL  string
-	WS   string
+	Name     string
+	URL      string
+	WS       string
 	Fallback func(*ServiceConfig) (string, error)
 }
 

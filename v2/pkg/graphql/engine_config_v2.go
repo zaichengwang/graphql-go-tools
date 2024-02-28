@@ -2,6 +2,8 @@ package graphql
 
 import (
 	"errors"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/astparser"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
 	"net/http"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
@@ -136,6 +138,17 @@ func (d *graphqlDataSourceV2Generator) Generate(config graphqlDataSource.Configu
 
 	planDataSource.Factory = factory
 	planDataSource.Custom = graphqlDataSource.ConfigJson(config)
+
+	// preprocess document
+	definition := ast.NewDocument()
+	definition.Input.ResetInputString(config.Federation.FederationSchema)
+	definitionParser := astparser.NewParser()
+	report := &operationreport.Report{}
+	definitionParser.Parse(definition, report)
+	if report.HasErrors() {
+		return plan.DataSourceConfiguration{}, errors.New(report.Error())
+	}
+	planDataSource.ParsedDocument = *definition
 
 	return planDataSource, nil
 }

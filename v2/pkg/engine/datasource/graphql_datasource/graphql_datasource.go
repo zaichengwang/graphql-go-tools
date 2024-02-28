@@ -23,7 +23,6 @@ import (
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/plan"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/resolve"
-	"github.com/wundergraph/graphql-go-tools/v2/pkg/federation"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/lexer/literal"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
 )
@@ -273,8 +272,10 @@ func ConfigJson(config Configuration) json.RawMessage {
 }
 
 type FederationConfiguration struct {
-	Enabled    bool
-	ServiceSDL string
+	Enabled          bool
+	ServiceSDL       string
+	UnionTypes       []string
+	FederationSchema string
 }
 
 type SubscriptionConfiguration struct {
@@ -1307,7 +1308,7 @@ func (p *Planner) printOperation() []byte {
 
 	// create empty operation and definition documents
 	operation := ast.NewDocument()
-	definition := ast.NewDocument()
+	definition := &p.dataSourceConfig.ParsedDocument
 	report := &operationreport.Report{}
 	operationParser := astparser.NewParser()
 	definitionParser := astparser.NewParser()
@@ -1328,17 +1329,19 @@ func (p *Planner) printOperation() []byte {
 	}
 
 	if p.config.Federation.Enabled {
-		federationSchema, err := federation.BuildFederationSchema(p.config.UpstreamSchema, p.config.Federation.ServiceSDL)
-		if err != nil {
-			p.visitor.Walker.StopWithInternalErr(err)
-			return nil
-		}
-		definition.Input.ResetInputString(federationSchema)
-		definitionParser.Parse(definition, report)
-		if report.HasErrors() {
-			p.stopWithError(parseDocumentFailedErrMsg, "definition")
-			return nil
-		}
+		// comment out since preprocessed
+
+		//federationSchema, err := federation.BuildFederationSchema(p.config.UpstreamSchema, p.config.Federation.ServiceSDL)
+		//if err != nil {
+		//	p.visitor.Walker.StopWithInternalErr(err)
+		//	return nil
+		//}
+		//definition.Input.ResetInputString(federationSchema)
+		//definitionParser.Parse(definition, report)
+		//if report.HasErrors() {
+		//	p.stopWithError(parseDocumentFailedErrMsg, "definition")
+		//	return nil
+		//}
 	} else {
 		definition.Input.ResetInputString(p.config.UpstreamSchema)
 		definitionParser.Parse(definition, report)

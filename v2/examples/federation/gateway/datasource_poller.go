@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/federation"
 	"io"
 	"log"
 	"net/http"
@@ -161,6 +162,7 @@ func (d *DatasourcePollerPoller) createDatasourceConfig() []graphqlDataSource.Co
 		if !exists {
 			continue
 		}
+		unionTypes := federation.EntityUnionTypes(sdl)
 
 		dataSourceConfig := graphqlDataSource.Configuration{
 			Fetch: graphqlDataSource.FetchConfiguration{
@@ -173,6 +175,7 @@ func (d *DatasourcePollerPoller) createDatasourceConfig() []graphqlDataSource.Co
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
 				ServiceSDL: sdl,
+				UnionTypes: unionTypes,
 			},
 		}
 
