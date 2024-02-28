@@ -19,6 +19,7 @@ func AnalyzePlanKind(operation, definition *ast.Document, operationName string) 
 
 	var report operationreport.Report
 	walker.Walk(operation, definition, &report)
+
 	if report.HasErrors() {
 		return ast.OperationTypeUnknown, false, report
 	}

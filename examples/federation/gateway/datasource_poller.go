@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/federation"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -16,9 +17,9 @@ import (
 )
 
 type ServiceConfig struct {
-	Name string
-	URL  string
-	WS   string
+	Name     string
+	URL      string
+	WS       string
 	Fallback func(*ServiceConfig) (string, error)
 }
 
@@ -162,6 +163,8 @@ func (d *DatasourcePollerPoller) createDatasourceConfig() []graphqlDataSource.Co
 			continue
 		}
 
+		unionTypes := federation.EntityUnionTypes(sdl)
+
 		dataSourceConfig := graphqlDataSource.Configuration{
 			Fetch: graphqlDataSource.FetchConfiguration{
 				URL:    serviceConfig.URL,
@@ -173,6 +176,7 @@ func (d *DatasourcePollerPoller) createDatasourceConfig() []graphqlDataSource.Co
 			Federation: graphqlDataSource.FederationConfiguration{
 				Enabled:    true,
 				ServiceSDL: sdl,
+				UnionTypes: unionTypes,
 			},
 		}
 

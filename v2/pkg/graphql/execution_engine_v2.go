@@ -6,13 +6,14 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
+	lru "github.com/hashicorp/golang-lru"
+	"github.com/jensneuse/abstractlogger"
 	"io"
 	"net/http"
 	"strconv"
 	"sync"
-
-	lru "github.com/hashicorp/golang-lru"
-	"github.com/jensneuse/abstractlogger"
+	"time"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astprinter"
@@ -227,6 +228,9 @@ func NewExecutionEngineV2(ctx context.Context, logger abstractlogger.Logger, eng
 }
 
 func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, writer resolve.FlushWriter, options ...ExecutionOptionsV2) error {
+	traceId := ctx.Value("trace_id")
+
+	startTime := time.Now().UnixNano()
 	if !operation.IsNormalized() {
 		result, err := operation.Normalize(e.config.schema)
 		if err != nil {
@@ -237,7 +241,11 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 			return result.Errors
 		}
 	}
+	endTime := time.Now().UnixNano()
+	fmt.Println("TraceID:", traceId, "NormalizationTime:", endTime-startTime)
+	ctx = context.WithValue(ctx, "NormalizationTime", endTime-startTime)
 
+	startTime = time.Now().UnixNano()
 	result, err := operation.ValidateForSchema(e.config.schema)
 	if err != nil {
 		return err
@@ -245,10 +253,12 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 	if !result.Valid {
 		return result.Errors
 	}
+	endTime = time.Now().UnixNano()
+	fmt.Println("TraceID:", traceId, "ValidationTime:", endTime-startTime)
+	ctx = context.WithValue(ctx, "ValidationTime", endTime-startTime)
 
 	execContext := e.getExecutionCtx()
 	defer e.putExecutionCtx(execContext)
-
 	execContext.prepare(ctx, operation.Variables, operation.request)
 
 	for i := range options {
@@ -256,25 +266,39 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 	}
 
 	var report operationreport.Report
+	startTime = time.Now().UnixNano()
 	cachedPlan := e.getCachedPlan(execContext, &operation.document, &e.config.schema.document, operation.OperationName, &report)
+	endTime = time.Now().UnixNano()
+	fmt.Println("TraceID:", traceId, "GetCachedPlanTime:", endTime-startTime)
+	ctx = context.WithValue(ctx, "GetCachedPlanTime", endTime-startTime)
+
 	if report.HasErrors() {
 		return report
 	}
 
 	switch p := cachedPlan.(type) {
 	case *plan.SynchronousResponsePlan:
+		startTime = time.Now().UnixNano()
 		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer)
+		endTime = time.Now().UnixNano()
+		fmt.Println("TraceID:", traceId, "ResolveGraphQLResponseTime:", endTime-startTime)
+		ctx = context.WithValue(ctx, "ResolveGraphQLResponseTime", endTime-startTime)
 	case *plan.SubscriptionResponsePlan:
+		startTime = time.Now().UnixNano()
 		err = e.resolver.ResolveGraphQLSubscription(execContext.resolveContext, p.Response, writer)
+		endTime = time.Now().UnixNano()
+		fmt.Println("TraceID:", traceId, "ResolveGraphQLSubscriptionTime:", endTime-startTime)
+		ctx = context.WithValue(ctx, "ResolveGraphQLSubscriptionTime", endTime-startTime)
 	default:
 		return errors.New("execution of operation is not possible")
 	}
 
 	return err
 }
-
 func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operation, definition *ast.Document, operationName string, report *operationreport.Report) plan.Plan {
+	traceId := ""
 
+	startTime := time.Now().UnixNano()
 	hash := pool.Hash64.Get()
 	hash.Reset()
 	defer pool.Hash64.Put(hash)
@@ -291,16 +315,25 @@ func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operati
 			return p
 		}
 	}
+	endTime := time.Now().UnixNano()
+	fmt.Println("TraceID:", traceId, "GetCachedPlanPart1Time:", endTime-startTime)
 
+	startTime = time.Now().UnixNano()
 	e.plannerMu.Lock()
 	defer e.plannerMu.Unlock()
 	planResult := e.planner.Plan(operation, definition, operationName, report)
+	endTime = time.Now().UnixNano()
+	fmt.Println("TraceID:", traceId, "Plan Time:", endTime-startTime)
+	startTime = time.Now().UnixNano()
 	if report.HasErrors() {
 		return nil
 	}
 
 	p := ctx.postProcessor.Process(planResult)
 	e.executionPlanCache.Add(cacheKey, p)
+	endTime = time.Now().UnixNano()
+	fmt.Println("TraceID:", traceId, "GetCachedPlanPart2Time:", endTime-startTime)
+
 	return p
 }
 

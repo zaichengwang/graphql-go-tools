@@ -3,9 +3,8 @@ package ast
 import (
 	"bytes"
 	"fmt"
-	"log"
-
 	"github.com/wundergraph/graphql-go-tools/v2/internal/pkg/unsafebytes"
+	"log"
 )
 
 type Node struct {

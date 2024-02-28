@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/buger/jsonparser"
 	"github.com/jensneuse/abstractlogger"
@@ -23,7 +24,6 @@ import (
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/plan"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/resolve"
-	"github.com/wundergraph/graphql-go-tools/v2/pkg/federation"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/lexer/literal"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
 )
@@ -273,8 +273,10 @@ func ConfigJson(config Configuration) json.RawMessage {
 }
 
 type FederationConfiguration struct {
-	Enabled    bool
-	ServiceSDL string
+	Enabled          bool
+	ServiceSDL       string
+	UnionTypes       []string
+	FederationSchema string
 }
 
 type SubscriptionConfiguration struct {
@@ -321,7 +323,10 @@ func (p *Planner) Register(visitor *plan.Visitor, configuration plan.DataSourceC
 func (p *Planner) ConfigureFetch() resolve.FetchConfiguration {
 	var input []byte
 	input = httpclient.SetInputBodyWithPath(input, p.upstreamVariables, "variables")
+	start := time.Now()
 	input = httpclient.SetInputBodyWithPath(input, p.printOperation(), "query")
+	elapsed := time.Since(start)
+	fmt.Println("Elapsed time for print:", elapsed)
 
 	if p.unnulVariables {
 		input = httpclient.SetInputFlag(input, httpclient.UNNULLVARIABLES)
@@ -1307,7 +1312,7 @@ func (p *Planner) printOperation() []byte {
 
 	// create empty operation and definition documents
 	operation := ast.NewDocument()
-	definition := ast.NewDocument()
+	definition := &p.dataSourceConfig.ParsedDocument
 	report := &operationreport.Report{}
 	operationParser := astparser.NewParser()
 	definitionParser := astparser.NewParser()
@@ -1320,7 +1325,10 @@ func (p *Planner) printOperation() []byte {
 	}
 
 	if p.config.UpstreamSchema == "" {
+		start := time.Now()
 		p.config.UpstreamSchema, err = astprinter.PrintString(p.visitor.Definition, nil)
+		elapsed := time.Since(start)
+		fmt.Println("Elapsed time set upstream schema:", elapsed)
 		if err != nil {
 			p.visitor.Walker.StopWithInternalErr(err)
 			return nil
@@ -1328,17 +1336,20 @@ func (p *Planner) printOperation() []byte {
 	}
 
 	if p.config.Federation.Enabled {
-		federationSchema, err := federation.BuildFederationSchema(p.config.UpstreamSchema, p.config.Federation.ServiceSDL)
-		if err != nil {
-			p.visitor.Walker.StopWithInternalErr(err)
-			return nil
-		}
-		definition.Input.ResetInputString(federationSchema)
-		definitionParser.Parse(definition, report)
-		if report.HasErrors() {
-			p.stopWithError(parseDocumentFailedErrMsg, "definition")
-			return nil
-		}
+		//federationSchema := p.config.Federation.FederationSchema
+		//if err != nil {
+		//	p.visitor.Walker.StopWithInternalErr(err)
+		//	return nil
+		//}
+		//definition.Input.ResetInputString(federationSchema)
+		//start := time.Now()
+		//definitionParser.Parse(definition, report)
+		//elapsed := time.Since(start)
+		//fmt.Println("definitionParser Elapsed time:", elapsed)
+		//if report.HasErrors() {
+		//	p.stopWithError(parseDocumentFailedErrMsg, "definition")
+		//	return nil
+		//}
 	} else {
 		definition.Input.ResetInputString(p.config.UpstreamSchema)
 		definitionParser.Parse(definition, report)

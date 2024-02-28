@@ -3,6 +3,7 @@ package plan
 import (
 	"context"
 	"encoding/json"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 
 	"github.com/cespare/xxhash/v2"
 
@@ -38,7 +39,8 @@ type DataSourceConfiguration struct {
 
 	FederationMetaData FederationMetaData
 
-	hash DSHash
+	hash           DSHash
+	ParsedDocument ast.Document
 }
 
 func (d *DataSourceConfiguration) Hash() DSHash {
