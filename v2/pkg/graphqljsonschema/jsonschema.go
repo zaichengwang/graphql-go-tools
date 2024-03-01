@@ -101,9 +101,6 @@ func (r *fromTypeRefResolver) fromTypeRef(operation, definition *ast.Document, t
 		panic("Should not be able to have multiple levels of non-null")
 	case ast.TypeKindNamed:
 		name := operation.Input.ByteSliceString(t.Name)
-		if name == "MoneyInput" {
-			print()
-		}
 		if schema, ok := r.overrides[name]; ok {
 			return schema
 		}
@@ -178,9 +175,6 @@ func (r *fromTypeRefResolver) fromTypeRef(operation, definition *ast.Document, t
 			}
 		}
 		if !isRootObject {
-			if name == "MoneyInput" {
-				print()
-			}
 			if existingObject, ok := (*r.defs)[name]; ok {
 				existingObjectType, ok := existingObject.(Object)
 				if ok {
