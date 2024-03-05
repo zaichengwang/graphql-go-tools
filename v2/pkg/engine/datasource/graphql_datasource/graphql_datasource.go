@@ -1097,9 +1097,12 @@ func (p *Planner) addVariableDefinitionsRecursively(value ast.Value, sourcePath 
 		p.argTypeRef = prevArgTypeRef
 		return
 	case ast.ValueKindList:
+		prevArgTypeRef := p.argTypeRef
+		p.argTypeRef = p.resolveNestedArgumentType(fieldName)
 		for _, i := range p.visitor.Operation.ListValues[value.Ref].Refs {
 			p.addVariableDefinitionsRecursively(p.visitor.Operation.Values[i], sourcePath, nil)
 		}
+		p.argTypeRef = prevArgTypeRef
 		return
 	case ast.ValueKindVariable:
 		// continue after switch
