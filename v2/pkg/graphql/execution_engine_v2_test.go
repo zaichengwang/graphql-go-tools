@@ -204,7 +204,7 @@ func TestExecutionEngineV2_Execute(t *testing.T) {
 			resultWriter := NewEngineResultWriter()
 			execCtx, execCtxCancel := context.WithCancel(context.Background())
 			defer execCtxCancel()
-			pr := operationreport.PerformanceReport{}
+			pr := operationreport.QueryExecutionReport{}
 			err = engine.Execute(execCtx, &operation, &resultWriter, &pr, testCase.engineOptions...)
 			actualResponse := resultWriter.String()
 			assert.Equal(t, testCase.expectedResponse, actualResponse)
@@ -1312,7 +1312,7 @@ func TestExecutionWithOptions(t *testing.T) {
 
 	operation := testCase.operation(t)
 	resultWriter := NewEngineResultWriter()
-	pr := operationreport.PerformanceReport{}
+	pr := operationreport.QueryExecutionReport{}
 	err = engine.Execute(context.Background(), &operation, &resultWriter, &pr, WithBeforeFetchHook(before), WithAfterFetchHook(after))
 
 	assert.Equal(t, `{"method":"GET","url":"https://example.com/","body":{"query":"{hero {name}}"}}`, before.input)
@@ -1390,7 +1390,7 @@ func TestExecutionEngineV2_GetCachedPlan(t *testing.T) {
 		}
 
 		report := operationreport.Report{}
-		pr := operationreport.PerformanceReport{}
+		pr := operationreport.QueryExecutionReport{}
 		cachedPlan := engine.getCachedPlan(firstInternalExecCtx, &gqlRequest.document, &schema.document, gqlRequest.OperationName, &report, &pr)
 		_, oldestCachedPlan, _ := engine.executionPlanCache.GetOldest()
 		assert.False(t, report.HasErrors())
@@ -1402,7 +1402,7 @@ func TestExecutionEngineV2_GetCachedPlan(t *testing.T) {
 			http.CanonicalHeaderKey("Authorization"): []string{"123abc"},
 		}
 
-		pr = operationreport.PerformanceReport{}
+		pr = operationreport.QueryExecutionReport{}
 		cachedPlan = engine.getCachedPlan(secondInternalExecCtx, &gqlRequest.document, &schema.document, gqlRequest.OperationName, &report, &pr)
 		_, oldestCachedPlan, _ = engine.executionPlanCache.GetOldest()
 		assert.False(t, report.HasErrors())
@@ -1420,7 +1420,7 @@ func TestExecutionEngineV2_GetCachedPlan(t *testing.T) {
 		}
 
 		report := operationreport.Report{}
-		pr := operationreport.PerformanceReport{}
+		pr := operationreport.QueryExecutionReport{}
 		cachedPlan := engine.getCachedPlan(firstInternalExecCtx, &gqlRequest.document, &schema.document, gqlRequest.OperationName, &report, &pr)
 		_, oldestCachedPlan, _ := engine.executionPlanCache.GetOldest()
 		assert.False(t, report.HasErrors())
@@ -1432,7 +1432,7 @@ func TestExecutionEngineV2_GetCachedPlan(t *testing.T) {
 			http.CanonicalHeaderKey("Authorization"): []string{"xyz098"},
 		}
 
-		pr = operationreport.PerformanceReport{}
+		pr = operationreport.QueryExecutionReport{}
 		cachedPlan = engine.getCachedPlan(secondInternalExecCtx, &differentGqlRequest.document, &schema.document, differentGqlRequest.OperationName, &report, &pr)
 		_, oldestCachedPlan, _ = engine.executionPlanCache.GetOldest()
 		assert.False(t, report.HasErrors())
@@ -1475,7 +1475,7 @@ func BenchmarkIntrospection(b *testing.B) {
 
 	writer := NewEngineResultWriter()
 	engine := newEngine()
-	pr := operationreport.PerformanceReport{}
+	pr := operationreport.QueryExecutionReport{}
 	require.NoError(b, engine.Execute(ctx, &req, &writer, &pr))
 	require.Equal(b, expectedResponse, writer.Bytes())
 
@@ -1493,7 +1493,7 @@ func BenchmarkIntrospection(b *testing.B) {
 		for pb.Next() {
 			bc := pool.Get().(*benchCase)
 			bc.writer.Reset()
-			pr := operationreport.PerformanceReport{}
+			pr := operationreport.QueryExecutionReport{}
 			require.NoError(b, bc.engine.Execute(ctx, &req, bc.writer, &pr))
 			if !bytes.Equal(expectedResponse, bc.writer.Bytes()) {
 				require.Equal(b, string(expectedResponse), bc.writer.String())
@@ -1559,7 +1559,7 @@ func BenchmarkExecutionEngineV2(b *testing.B) {
 
 	writer := NewEngineResultWriter()
 	engine := newEngine()
-	pr := operationreport.PerformanceReport{}
+	pr := operationreport.QueryExecutionReport{}
 	require.NoError(b, engine.Execute(ctx, &req, &writer, &pr))
 	require.Equal(b, "{\"data\":{\"hello\":\"world\"}}", writer.String())
 
@@ -1577,7 +1577,7 @@ func BenchmarkExecutionEngineV2(b *testing.B) {
 		for pb.Next() {
 			bc := pool.Get().(*benchCase)
 			bc.writer.Reset()
-			pr := operationreport.PerformanceReport{}
+			pr := operationreport.QueryExecutionReport{}
 			_ = bc.engine.Execute(ctx, &req, bc.writer, &pr)
 			pool.Put(bc)
 		}

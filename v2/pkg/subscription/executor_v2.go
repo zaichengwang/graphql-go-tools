@@ -64,7 +64,7 @@ func (e *ExecutorV2) Execute(writer resolve.FlushWriter) error {
 	case *InitialHttpRequestContext:
 		options = append(options, graphql.WithAdditionalHttpHeaders(ctx.Request.Header))
 	}
-	pr := operationreport.PerformanceReport{}
+	pr := operationreport.QueryExecutionReport{}
 	return e.engine.Execute(e.context, e.operation, writer, &pr, options...)
 }
 

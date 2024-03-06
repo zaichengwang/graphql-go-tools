@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
 	"io"
 	"strconv"
 	"sync"
@@ -96,7 +97,8 @@ func (r *Resolver) resolveNode(ctx *Context, node Node, data []byte, bufPair *Bu
 	}
 }
 
-func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLResponse, data []byte, writer io.Writer) (err error) {
+func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLResponse, data []byte, writer io.Writer,
+	executionReport *operationreport.QueryExecutionReport) (err error) {
 
 	if response.Info == nil {
 		response.Info = &GraphQLResponseInfo{
@@ -113,10 +115,15 @@ func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLRespons
 
 	err = t.loader.LoadGraphQLResponseData(ctx, response, t.resolvable)
 	if err != nil {
+		executionReport.LoadGraphQLResponseDataError = err
 		return err
 	}
 
-	return t.resolvable.Resolve(response.Data, writer)
+	err = t.resolvable.Resolve(response.Data, writer)
+	if err != nil {
+		executionReport.ResolveGraphQLResponseError = err
+	}
+	return err
 }
 
 func (r *Resolver) ResolveGraphQLSubscription(ctx *Context, subscription *GraphQLSubscription, writer FlushWriter) (err error) {

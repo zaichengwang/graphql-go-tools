@@ -228,31 +228,35 @@ func NewExecutionEngineV2(ctx context.Context, logger abstractlogger.Logger, eng
 }
 
 func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, writer resolve.FlushWriter,
-	performanceReport *operationreport.PerformanceReport,
+	executionReport *operationreport.QueryExecutionReport,
 	options ...ExecutionOptionsV2) error {
 	startTime := time.Now().UnixNano()
 
 	if !operation.IsNormalized() {
 		result, err := operation.Normalize(e.config.schema)
 		if err != nil {
+			executionReport.SchemaNormalizationError = err
 			return err
 		}
 
 		if !result.Successful {
+			executionReport.SchemaNormalizationError = result.Errors
 			return result.Errors
 		}
 	}
 
 	result, err := operation.ValidateForSchema(e.config.schema)
 	if err != nil {
+		executionReport.SchemaValidationError = err
 		return err
 	}
 	if !result.Valid {
+		executionReport.SchemaValidationError = result.Errors
 		return result.Errors
 	}
 
 	endTime := time.Now().UnixNano()
-	performanceReport.SchemaValidationTime = endTime - startTime
+	executionReport.SchemaValidationTime = endTime - startTime
 
 	execContext := e.getExecutionCtx()
 	defer e.putExecutionCtx(execContext)
@@ -267,25 +271,26 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 	startTime = time.Now().UnixNano()
 
 	cachedPlan := e.getCachedPlan(execContext, &operation.document, &e.config.schema.document,
-		operation.OperationName, &report, performanceReport)
+		operation.OperationName, &report, executionReport)
 
 	endTime = time.Now().UnixNano()
-	performanceReport.PlanTime = endTime - startTime
+	executionReport.PlanTime = endTime - startTime
 
 	if report.HasErrors() {
+		executionReport.QueryPlanningError = report
 		return report
 	}
 
 	startTime = time.Now().UnixNano()
 	switch p := cachedPlan.(type) {
 	case *plan.SynchronousResponsePlan:
-		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer)
+		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer, executionReport)
 		endTime = time.Now().UnixNano()
-		performanceReport.ResolveResponseTime = endTime - startTime
+		executionReport.ResolveResponseTime = endTime - startTime
 	case *plan.SubscriptionResponsePlan:
 		err = e.resolver.ResolveGraphQLSubscription(execContext.resolveContext, p.Response, writer)
 		endTime = time.Now().UnixNano()
-		performanceReport.ResolveResponseTime = endTime - startTime
+		executionReport.ResolveResponseTime = endTime - startTime
 	default:
 		return errors.New("execution of operation is not possible")
 	}
@@ -294,7 +299,7 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 }
 
 func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operation, definition *ast.Document, operationName string,
-	report *operationreport.Report, performanceReport *operationreport.PerformanceReport) plan.Plan {
+	report *operationreport.Report, performanceReport *operationreport.QueryExecutionReport) plan.Plan {
 
 	hash := pool.Hash64.Get()
 	hash.Reset()

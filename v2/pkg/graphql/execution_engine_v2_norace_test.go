@@ -47,7 +47,7 @@ func TestExecutionEngineV2_FederationAndSubscription_IntegrationTest(t *testing.
 				Query:         federationtesting.QueryReviewsOfMe,
 			}
 
-			pr := operationreport.PerformanceReport{}
+			pr := operationreport.QueryExecutionReport{}
 
 			validationResult, err := gqlRequest.ValidateForSchema(schema)
 			require.NoError(t, err)
@@ -102,7 +102,7 @@ subscription UpdatedPrice {
 			})
 
 			go func() {
-				pr := operationreport.PerformanceReport{}
+				pr := operationreport.QueryExecutionReport{}
 				err := engine.Execute(execCtx, gqlRequest, &resultWriter, &pr)
 				assert.NoError(t, err)
 			}()
