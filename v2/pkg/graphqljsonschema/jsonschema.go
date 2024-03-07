@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/buger/jsonparser"
 	"github.com/santhosh-tekuri/jsonschema/v5"
@@ -136,7 +137,15 @@ func (r *fromTypeRefResolver) fromTypeRef(operation, definition *ast.Document, t
 			r.defs = &object.Defs
 		}
 		if !isRootObject {
-			if _, exists := (*r.defs)[name]; exists {
+			if existingObject, exists := (*r.defs)[name]; exists {
+				// update types while differentiating between non-null and nullable types
+				existingObjectType, ok := existingObject.(Object)
+
+				if ok && !compareStringSlices(existingObjectType.Type, object.Type) {
+					ob := mergeObjectTypes(object, existingObjectType)
+					(*r.defs)[name] = ob
+				}
+
 				return NewRef(name)
 			}
 			(*r.defs)[name] = object
@@ -166,12 +175,66 @@ func (r *fromTypeRefResolver) fromTypeRef(operation, definition *ast.Document, t
 			}
 		}
 		if !isRootObject {
+			if existingObject, ok := (*r.defs)[name]; ok {
+				existingObjectType, ok := existingObject.(Object)
+				if ok {
+					object = mergeObjectTypes(existingObjectType, object)
+				}
+			}
+
 			(*r.defs)[name] = object
 			return NewRef(name)
 		}
 		return object
 	}
 	return NewObject(nonNull)
+}
+
+func compareStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	sort.Strings(a)
+	sort.Strings(b)
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
+}
+func mergeObjectTypes(left, baseObject Object) Object {
+	// Create a set to store unique types
+	typeSet := make(map[string]bool)
+
+	// Add existing types to the set
+	for _, t := range left.Type {
+		typeSet[t] = true
+	}
+
+	// Add new types to the set
+	for _, t := range baseObject.Type {
+		typeSet[t] = true
+	}
+
+	// Clear the baseObject.Type slice
+	baseObject.Type = nil
+
+	// Create a slice from the keys of typeSet
+	keys := make([]string, 0, len(typeSet))
+	for k := range typeSet {
+		keys = append(keys, k)
+	}
+
+	// Sort the keys
+	sort.Slice(keys, func(i, j int) bool {
+		return keys[i] > keys[j]
+	})
+
+	// Append sorted unique types to the baseObject.Type slice
+	baseObject.Type = append(baseObject.Type, keys...)
+
+	return baseObject
 }
 
 type Validator struct {
