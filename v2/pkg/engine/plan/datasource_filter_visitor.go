@@ -534,7 +534,7 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestio
 					break
 				}
 			}
-			// second round, for the node with isPrimaryDataSource = true, assign 100 - rolloutPercentageTotal
+			// second round, for the node with IsPrimaryDataSource = true, assign 100 - rolloutPercentageTotal
 			if rolloutEnabled {
 				for index, _ := range nodeDuplicates {
 					currentNode := nodes[nodeDuplicates[index]]
@@ -545,7 +545,7 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestio
 					}
 				}
 			}
-			// random pick up the node based on rollout config: rolloutPercentage
+			// random pick up the node based on rollout config: RolloutPercentage
 			if rolloutEnabled {
 				rolloutPercentage := 0
 				for index, _ := range nodeDuplicates {
@@ -556,7 +556,7 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestio
 					}
 				}
 				// select the node based on rollout config
-				// if the random number is less than rolloutPercentage, select the node
+				// if the random number is less than RolloutPercentage, select the node
 				if rolloutPercentage > 0 {
 					randomNumber := rand.Intn(101)
 					if randomNumber <= rolloutPercentage {

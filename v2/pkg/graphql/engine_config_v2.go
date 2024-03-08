@@ -149,6 +149,9 @@ func (d *graphqlDataSourceV2Generator) Generate(config graphqlDataSource.Configu
 		return plan.DataSourceConfiguration{}, errors.New(report.Error())
 	}
 	planDataSource.ParsedDocument = *definition
+	planDataSource.IsPrimaryDataSource = config.IsPrimaryDataSource
+	planDataSource.RolloutPercentage = config.RolloutPercentage
+	planDataSource.IsRolloutEnabled = config.IsRolloutEnabled
 
 	return planDataSource, nil
 }

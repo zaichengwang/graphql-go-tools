@@ -259,6 +259,13 @@ type Configuration struct {
 	Federation             FederationConfiguration
 	UpstreamSchema         string
 	CustomScalarTypeFields []SingleTypeField
+	// The below configurations are used to setup the grey rollout
+	// used for ottergate data source
+	IsPrimaryDataSource bool
+	// rolloutPercentage is the percentage of traffic that should be routed to this data source
+	RolloutPercentage int
+	// indicate if rollout is enabled
+	IsRolloutEnabled bool
 }
 
 type SingleTypeField struct {
