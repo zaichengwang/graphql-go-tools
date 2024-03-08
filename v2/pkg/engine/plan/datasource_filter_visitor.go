@@ -55,6 +55,20 @@ func (f *DataSourceFilter) findBestDataSourceSet(dataSources []DataSourceConfigu
 
 	nodes, hasDuplicates := selectUniqNodes(nodes)
 	print(hasDuplicates)
+	if hasDuplicates {
+		// assign datasource config to the nodes
+		// make datasource config to hash->config map
+		dsConfigMap := make(map[DSHash]DataSourceConfiguration)
+		for _, dsConfig := range dataSources {
+			dsConfigMap[dsConfig.hash] = dsConfig
+		}
+		for i := range nodes {
+			nodes[i].isPrimaryDataSource = dsConfigMap[nodes[i].DataSourceHash].IsPrimaryDataSource
+			nodes[i].rolloutPercentage = dsConfigMap[nodes[i].DataSourceHash].RolloutPercentage
+			nodes[i].isRolloutEnabled = dsConfigMap[nodes[i].DataSourceHash].IsRolloutEnabled
+		}
+
+	}
 	nodes = selectDuplicateNodes(nodes, false)
 	nodes = selectDuplicateNodes(nodes, true)
 
