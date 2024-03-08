@@ -8,6 +8,7 @@ import (
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astvisitor"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
+	"math/rand"
 )
 
 const typeNameField = "__typename"
@@ -52,7 +53,8 @@ func (f *DataSourceFilter) findBestDataSourceSet(dataSources []DataSourceConfigu
 		return nil
 	}
 
-	nodes = selectUniqNodes(nodes)
+	nodes, hasDuplicates := selectUniqNodes(nodes)
+	print(hasDuplicates)
 	nodes = selectDuplicateNodes(nodes, false)
 	nodes = selectDuplicateNodes(nodes, true)
 
@@ -108,6 +110,13 @@ type NodeSuggestion struct {
 	onFragment                bool
 	selected                  bool
 	selectionReasons          []string
+
+	// Those are configs related to roll out feature
+	isPrimaryDataSource bool
+	// rolloutPercentage is the percentage of traffic that should be routed to this data source
+	rolloutPercentage int
+	// indicate if rollout is enabled
+	isRolloutEnabled bool
 }
 
 func (n *NodeSuggestion) appendSelectionReason(reason string) {
@@ -405,9 +414,12 @@ const (
 	ReasonStage2SameSourceNodeOfSelectedSibling         = "stage2: node on the same source as selected sibling"
 
 	ReasonStage3SelectAvailableNode = "stage3: select first available node"
+
+	ReasonStage3SelectBasedOnRolloutConfig = "stage3: select based on rollout config"
 )
 
-func selectUniqNodes(nodes NodeSuggestions) []NodeSuggestion {
+func selectUniqNodes(nodes NodeSuggestions) ([]NodeSuggestion, bool) {
+	hasDuplictes := false
 	for i := range nodes {
 		if nodes[i].selected {
 			continue
@@ -415,6 +427,7 @@ func selectUniqNodes(nodes NodeSuggestions) []NodeSuggestion {
 
 		isNodeUnique := nodes.isNodeUniq(i)
 		if !isNodeUnique {
+			hasDuplictes = true
 			continue
 		}
 
@@ -446,7 +459,7 @@ func selectUniqNodes(nodes NodeSuggestions) []NodeSuggestion {
 			}
 		}
 	}
-	return nodes
+	return nodes, hasDuplictes
 }
 
 func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestion {
@@ -507,7 +520,52 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestio
 		}
 
 		if secondRun {
-			nodes[i].selectWithReason(ReasonStage3SelectAvailableNode)
+			// This is the place where we have 2 or more nodes with the same path and the same source
+			// We need to select one of them based on rollout config
+			nodeDuplicates = nodes.duplicatesOf(i)
+			nodeDuplicates = append(nodeDuplicates, i)
+			rolloutEnabled := false
+			rolloutPercentageTotal := 0
+			for index, _ := range nodeDuplicates {
+				currentNode := nodes[nodeDuplicates[index]]
+				if currentNode.isRolloutEnabled && currentNode.rolloutPercentage > 0 {
+					rolloutEnabled = true
+					rolloutPercentageTotal += currentNode.rolloutPercentage
+					break
+				}
+			}
+			// second round, for the node with isPrimaryDataSource = true, assign 100 - rolloutPercentageTotal
+			if rolloutEnabled {
+				for index, _ := range nodeDuplicates {
+					currentNode := nodes[nodeDuplicates[index]]
+					if currentNode.isPrimaryDataSource {
+						currentNode.rolloutPercentage = 100 - rolloutPercentageTotal
+						nodes[nodeDuplicates[index]] = currentNode
+						break
+					}
+				}
+			}
+			// random pick up the node based on rollout config: rolloutPercentage
+			if rolloutEnabled {
+				rolloutPercentage := 0
+				for index, _ := range nodeDuplicates {
+					currentNode := nodes[nodeDuplicates[index]]
+					if currentNode.isRolloutEnabled && currentNode.rolloutPercentage > 0 {
+						rolloutPercentage = currentNode.rolloutPercentage
+						break
+					}
+				}
+				// select the node based on rollout config
+				// if the random number is less than rolloutPercentage, select the node
+				if rolloutPercentage > 0 {
+					randomNumber := rand.Intn(101)
+					if randomNumber <= rolloutPercentage {
+						nodes[nodeDuplicates[0]].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig)
+					}
+				}
+			} else {
+				nodes[i].selectWithReason(ReasonStage3SelectAvailableNode)
+			}
 		}
 	}
 	return nodes

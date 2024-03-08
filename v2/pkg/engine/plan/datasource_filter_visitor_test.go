@@ -45,6 +45,10 @@ func (b *dsBuilder) Hash(hash DSHash) *dsBuilder {
 	return b
 }
 
+func (b *dsBuilder) DSPtr() *DataSourceConfiguration {
+	return b.ds
+}
+
 func (b *dsBuilder) DS() DataSourceConfiguration {
 	if len(b.ds.Custom) == 0 {
 		panic("schema not set")
