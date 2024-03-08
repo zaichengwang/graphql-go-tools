@@ -575,6 +575,9 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestio
 					randomNumber := rand.Intn(101)
 					if randomNumber <= rolloutPercentage {
 						nodes[nodeDuplicates[0]].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig)
+					} else {
+						// we assume only 2 duplicates
+						nodes[nodeDuplicates[1]].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig)
 					}
 				}
 			} else {
