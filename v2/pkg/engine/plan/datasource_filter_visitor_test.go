@@ -57,6 +57,15 @@ func (b *dsBuilder) DS() DataSourceConfiguration {
 	return *b.ds
 }
 
+func (b *dsBuilder) RolloutConfig(ID string, IsPrimaryDataSource bool,
+	RolloutPercentage int, IsRolloutEnabled bool) *dsBuilder {
+	b.ds.ID = ID
+	b.ds.IsPrimaryDataSource = IsPrimaryDataSource
+	b.ds.RolloutPercentage = RolloutPercentage
+	b.ds.IsRolloutEnabled = IsRolloutEnabled
+	return b
+}
+
 func strptr(s string) *string { return &s }
 
 func TestNodeSuggestions(t *testing.T) {
@@ -639,6 +648,41 @@ func TestFindBestDataSourceSet(t *testing.T) {
 			},
 		},
 		{
+			Description: "Shareable: 2 ds are equal, having rollout config",
+			Definition:  shareableDefinition,
+			Query: `
+				query {
+					me {
+						details {
+							forename
+						}
+					}
+				}
+			`,
+			DataSources: []DataSourceConfiguration{
+				shareableDS1WithRolloutEnabled,
+				shareableDS2WithRolloutEnabled,
+			},
+			ExpectedVariants: []Variant{
+				{
+					dsOrder: []int{0, 1},
+					suggestions: NodeSuggestions{
+						{TypeName: "Query", FieldName: "me", DataSourceHash: 22, Path: "query.me", ParentPath: "query", IsRootNode: true, selected: true, DataSourceID: "shared2", isPrimaryDataSource: false, rolloutPercentage: 100, isRolloutEnabled: true},
+						{TypeName: "User", FieldName: "details", DataSourceHash: 22, Path: "query.me.details", ParentPath: "query.me", IsRootNode: true, selected: true, DataSourceID: "shared2", isPrimaryDataSource: false, rolloutPercentage: 100, isRolloutEnabled: true},
+						{TypeName: "Details", FieldName: "forename", DataSourceHash: 22, Path: "query.me.details.forename", ParentPath: "query.me.details", IsRootNode: false, selected: true, DataSourceID: "shared2", isPrimaryDataSource: false, rolloutPercentage: 100, isRolloutEnabled: true},
+					},
+				},
+				{
+					dsOrder: []int{1, 0},
+					suggestions: NodeSuggestions{
+						{TypeName: "Query", FieldName: "me", DataSourceHash: 22, Path: "query.me", ParentPath: "query", IsRootNode: true, selected: true, DataSourceID: "shared2", isPrimaryDataSource: false, rolloutPercentage: 100, isRolloutEnabled: true},
+						{TypeName: "User", FieldName: "details", DataSourceHash: 22, Path: "query.me.details", ParentPath: "query.me", IsRootNode: true, selected: true, DataSourceID: "shared2", isPrimaryDataSource: false, rolloutPercentage: 100, isRolloutEnabled: true},
+						{TypeName: "Details", FieldName: "forename", DataSourceHash: 22, Path: "query.me.details.forename", ParentPath: "query.me.details", IsRootNode: false, selected: true, DataSourceID: "shared2", isPrimaryDataSource: false, rolloutPercentage: 100, isRolloutEnabled: true},
+					},
+				},
+			},
+		},
+		{
 			Description: "Shareable: choose second it provides more fields",
 			Definition:  shareableDefinition,
 			Query: `
@@ -889,13 +933,16 @@ func TestFindBestDataSourceSet(t *testing.T) {
 		definition := unsafeparser.ParseGraphqlDocumentStringWithBaseSchema(Definition)
 		operation := unsafeparser.ParseGraphqlDocumentString(Query)
 		report := operationreport.Report{}
+		queryExecutionReport := operationreport.QueryExecutionReport{
+			PlanDecisionMap: make(map[string]string),
+		}
 
 		astvalidation.DefaultOperationValidator().Validate(&operation, &definition, &report)
 		if report.HasErrors() {
 			t.Fatal(report.Error())
 		}
 
-		dsFilter := NewDataSourceFilter(&operation, &definition, &report)
+		dsFilter := NewDataSourceFilter(&operation, &definition, &report, &queryExecutionReport)
 		if report.HasErrors() {
 			t.Fatal(report.Error())
 		}
@@ -992,6 +1039,13 @@ var shareableDS1 = dsb().Hash(11).Schema(shareableDS1Schema).
 	ChildNode("Details", "forename", "middlename").
 	DS()
 
+var shareableDS1WithRolloutEnabled = dsb().Hash(11).Schema(shareableDS1Schema).
+	RootNode("Query", "me").
+	RootNode("User", "id", "details").
+	ChildNode("Details", "forename", "middlename").
+	RolloutConfig("shared1", true, 0, true).
+	DS()
+
 const shareableDS2Schema = `
 	type User @key(fields: "id") {
 		id: ID!
@@ -1012,6 +1066,13 @@ var shareableDS2 = dsb().Hash(22).Schema(shareableDS2Schema).
 	RootNode("Query", "me").
 	RootNode("User", "id", "details").
 	ChildNode("Details", "forename", "surname").
+	DS()
+
+var shareableDS2WithRolloutEnabled = dsb().Hash(22).Schema(shareableDS2Schema).
+	RootNode("Query", "me").
+	RootNode("User", "id", "details").
+	ChildNode("Details", "forename", "surname").
+	RolloutConfig("shared2", false, 100, true).
 	DS()
 
 const shareableDS3Schema = `

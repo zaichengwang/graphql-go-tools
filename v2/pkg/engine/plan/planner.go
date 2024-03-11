@@ -3,7 +3,9 @@ package plan
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astprinter"
@@ -71,6 +73,7 @@ func (p *Planner) SetDebugConfig(config DebugConfiguration) {
 
 func (p *Planner) Plan(operation, definition *ast.Document, operationName string, report *operationreport.Report,
 	queryExecutionReport *operationreport.QueryExecutionReport) (plan Plan) {
+	rand.Seed(time.Now().UnixNano())
 	p.selectOperation(operation, operationName, report)
 	if report.HasErrors() {
 		return

@@ -2,10 +2,8 @@ package plan
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
-
 	"github.com/pkg/errors"
+	"math/rand"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astvisitor"
@@ -542,59 +540,58 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool,
 		}
 
 		if secondRun {
-			// This is the place where we have 2 or more nodes with the same path and the same source
-			// We need to select one of them based on rollout config
-			nodeDuplicates = nodes.duplicatesOf(i)
-			nodeDuplicates = append(nodeDuplicates, i)
+			// Initialize rollout variables
 			rolloutEnabled := false
 			rolloutPercentageTotal := 0
-			for index, _ := range nodeDuplicates {
-				currentNode := nodes[nodeDuplicates[index]]
-				if currentNode.isRolloutEnabled && currentNode.rolloutPercentage > 0 {
+			primaryNodeIndex := -1
+			// Retrieve duplicates including the current node
+			nodeDuplicates = append(nodeDuplicates, i)
+			// Check if rollout is enabled and calculate total rollout percentage
+			for _, nodeIndex := range nodeDuplicates {
+				currentNode := nodes[nodeIndex]
+				if currentNode.isRolloutEnabled && (currentNode.rolloutPercentage > 0 || currentNode.isPrimaryDataSource) {
 					rolloutEnabled = true
 					rolloutPercentageTotal += currentNode.rolloutPercentage
-					break
+					if currentNode.isPrimaryDataSource {
+						primaryNodeIndex = nodeIndex
+					}
 				}
 			}
 
-			rolloutEnabled = rolloutEnabled && len(nodeDuplicates) == 2
-			if len(nodeDuplicates) > 2 {
+			// Validate the number of duplicates
+			if len(nodeDuplicates) != 2 {
 				queryExecutionReport.PlanDecisionError = errors.New("more than 2 duplicates found " + fmt.Sprintf("%v", nodes[i].Path))
+				continue
 			}
-			// second round, for the node with IsPrimaryDataSource = true, assign 100 - rolloutPercentageTotal
-			if rolloutEnabled {
-				for index, _ := range nodeDuplicates {
-					currentNode := nodes[nodeDuplicates[index]]
-					if currentNode.isPrimaryDataSource {
-						currentNode.rolloutPercentage = 100 - rolloutPercentageTotal
-						nodes[nodeDuplicates[index]] = currentNode
-						break
+
+			// If only two nodes and rollout is enabled, proceed with selection
+			if rolloutEnabled && len(nodeDuplicates) == 2 {
+				if primaryNodeIndex != -1 {
+					// Assign the remaining rollout percentage to the primary node
+					nodes[primaryNodeIndex].rolloutPercentage = 100 - rolloutPercentageTotal
+				} else {
+					queryExecutionReport.QueryPlanningError = errors.New("primary node not found " + fmt.Sprintf("%v", nodes[i].Path))
+					continue
+				}
+
+				// Select a node based on rollout percentage
+				randomNumber := rand.Intn(101)
+				selectedNodeIndex := primaryNodeIndex
+				if randomNumber > nodes[primaryNodeIndex].rolloutPercentage {
+					// Select the non-primary node
+					for _, nodeIndex := range nodeDuplicates {
+						if nodeIndex != primaryNodeIndex {
+							selectedNodeIndex = nodeIndex
+							break
+						}
 					}
 				}
-				// random pick up the node based on rollout config: RolloutPercentage
-				rolloutPercentage := 0
-				for index, _ := range nodeDuplicates {
-					currentNode := nodes[nodeDuplicates[index]]
-					if currentNode.isRolloutEnabled && currentNode.rolloutPercentage > 0 {
-						rolloutPercentage = currentNode.rolloutPercentage
-						break
-					}
-				}
-				// select the node based on rollout config
-				// if the random number is less than RolloutPercentage, select the node
-				if rolloutPercentage > 0 {
-					rand.Seed(time.Now().UnixNano())
-					randomNumber := rand.Intn(101)
-					if randomNumber <= rolloutPercentage {
-						nodes[nodeDuplicates[0]].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig)
-						queryExecutionReport.PlanDecisionMap[nodes[nodeDuplicates[0]].Path] = nodes[nodeDuplicates[0]].DataSourceID
-					} else {
-						// we assume only 2 duplicates
-						nodes[nodeDuplicates[1]].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig)
-						queryExecutionReport.PlanDecisionMap[nodes[nodeDuplicates[1]].Path] = nodes[nodeDuplicates[1]].DataSourceID
-					}
-				}
+
+				// Apply the selection
+				nodes[selectedNodeIndex].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig)
+				queryExecutionReport.PlanDecisionMap[nodes[selectedNodeIndex].Path] = nodes[selectedNodeIndex].DataSourceID
 			} else {
+				// Default selection when rollout is not enabled or there are not exactly two nodes
 				nodes[i].selectWithReason(ReasonStage3SelectAvailableNode)
 			}
 		}

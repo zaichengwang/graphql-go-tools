@@ -33,7 +33,10 @@ func TestPlanner_Plan(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		p := NewPlanner(ctx, config)
-		return p.Plan(&op, &def, operationName, report)
+		queryExecutionReport := operationreport.QueryExecutionReport{
+			PlanDecisionMap: make(map[string]string),
+		}
+		return p.Plan(&op, &def, operationName, report, &queryExecutionReport)
 	}
 
 	test := func(definition, operation, operationName string, expectedPlan Plan, config Configuration) func(t *testing.T) {

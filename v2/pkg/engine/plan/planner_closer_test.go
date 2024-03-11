@@ -59,7 +59,10 @@ func TestCloser(t *testing.T) {
 	}
 
 	p := NewPlanner(ctx, cfg)
-	plan := p.Plan(&op, &def, "", report)
+	queryExecutionReport := operationreport.QueryExecutionReport{
+		PlanDecisionMap: make(map[string]string),
+	}
+	plan := p.Plan(&op, &def, "", report, &queryExecutionReport)
 	assert.NotNil(t, plan)
 
 	cancel()     // terminate all stateful sources
