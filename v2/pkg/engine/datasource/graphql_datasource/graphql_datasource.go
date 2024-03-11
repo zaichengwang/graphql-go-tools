@@ -266,6 +266,8 @@ type Configuration struct {
 	RolloutPercentage int
 	// indicate if rollout is enabled
 	IsRolloutEnabled bool
+	// ID is a unique identifier for the DataSource
+	ID string
 }
 
 type SingleTypeField struct {

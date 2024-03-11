@@ -299,7 +299,7 @@ func (e *ExecutionEngineV2) Execute(ctx context.Context, operation *Request, wri
 }
 
 func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operation, definition *ast.Document, operationName string,
-	report *operationreport.Report, performanceReport *operationreport.QueryExecutionReport) plan.Plan {
+	report *operationreport.Report, queryExecutionReport *operationreport.QueryExecutionReport) plan.Plan {
 
 	hash := pool.Hash64.Get()
 	hash.Reset()
@@ -314,15 +314,15 @@ func (e *ExecutionEngineV2) getCachedPlan(ctx *internalExecutionContext, operati
 
 	if cached, ok := e.executionPlanCache.Get(cacheKey); ok {
 		if p, ok := cached.(plan.Plan); ok {
-			performanceReport.IsUsingCachedPlan = true
+			queryExecutionReport.IsUsingCachedPlan = true
 			return p
 		}
 	}
-	performanceReport.IsUsingCachedPlan = false
+	queryExecutionReport.IsUsingCachedPlan = false
 
 	e.plannerMu.Lock()
 	defer e.plannerMu.Unlock()
-	planResult := e.planner.Plan(operation, definition, operationName, report)
+	planResult := e.planner.Plan(operation, definition, operationName, report, queryExecutionReport)
 	if report.HasErrors() {
 		return nil
 	}

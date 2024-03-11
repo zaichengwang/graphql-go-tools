@@ -2,28 +2,31 @@ package plan
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/pkg/errors"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astvisitor"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
-	"math/rand"
 )
 
 const typeNameField = "__typename"
 
 type DataSourceFilter struct {
-	operation  *ast.Document
-	definition *ast.Document
-	report     *operationreport.Report
+	operation            *ast.Document
+	definition           *ast.Document
+	report               *operationreport.Report
+	queryExecutionReport *operationreport.QueryExecutionReport
 }
 
-func NewDataSourceFilter(operation, definition *ast.Document, report *operationreport.Report) *DataSourceFilter {
+func NewDataSourceFilter(operation, definition *ast.Document, report *operationreport.Report,
+	queryExecutionReport *operationreport.QueryExecutionReport) *DataSourceFilter {
 	return &DataSourceFilter{
-		operation:  operation,
-		definition: definition,
-		report:     report,
+		operation:            operation,
+		definition:           definition,
+		report:               report,
+		queryExecutionReport: queryExecutionReport,
 	}
 }
 
@@ -66,11 +69,12 @@ func (f *DataSourceFilter) findBestDataSourceSet(dataSources []DataSourceConfigu
 			nodes[i].isPrimaryDataSource = dsConfigMap[nodes[i].DataSourceHash].IsPrimaryDataSource
 			nodes[i].rolloutPercentage = dsConfigMap[nodes[i].DataSourceHash].RolloutPercentage
 			nodes[i].isRolloutEnabled = dsConfigMap[nodes[i].DataSourceHash].IsRolloutEnabled
+			nodes[i].DataSourceID = dsConfigMap[nodes[i].DataSourceHash].ID
 		}
 
 	}
-	nodes = selectDuplicateNodes(nodes, false)
-	nodes = selectDuplicateNodes(nodes, true)
+	nodes = selectDuplicateNodes(nodes, false, f.queryExecutionReport)
+	nodes = selectDuplicateNodes(nodes, true, f.queryExecutionReport)
 
 	nodes = selectedNodes(nodes)
 
@@ -131,6 +135,8 @@ type NodeSuggestion struct {
 	rolloutPercentage int
 	// indicate if rollout is enabled
 	isRolloutEnabled bool
+
+	DataSourceID string
 }
 
 func (n *NodeSuggestion) appendSelectionReason(reason string) {
@@ -476,7 +482,8 @@ func selectUniqNodes(nodes NodeSuggestions) ([]NodeSuggestion, bool) {
 	return nodes, hasDuplictes
 }
 
-func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestion {
+func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool,
+	queryExecutionReport *operationreport.QueryExecutionReport) []NodeSuggestion {
 	for i := range nodes {
 		if nodes[i].selected {
 			continue
@@ -548,6 +555,11 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestio
 					break
 				}
 			}
+
+			rolloutEnabled = rolloutEnabled && len(nodeDuplicates) == 2
+			if len(nodeDuplicates) > 2 {
+				queryExecutionReport.PlanDecisionError = errors.New("more than 2 duplicates found " + fmt.Sprintf("%v", nodes[i].Path))
+			}
 			// second round, for the node with IsPrimaryDataSource = true, assign 100 - rolloutPercentageTotal
 			if rolloutEnabled {
 				for index, _ := range nodeDuplicates {
@@ -558,9 +570,7 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestio
 						break
 					}
 				}
-			}
-			// random pick up the node based on rollout config: RolloutPercentage
-			if rolloutEnabled {
+				// random pick up the node based on rollout config: RolloutPercentage
 				rolloutPercentage := 0
 				for index, _ := range nodeDuplicates {
 					currentNode := nodes[nodeDuplicates[index]]
@@ -575,9 +585,11 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestio
 					randomNumber := rand.Intn(101)
 					if randomNumber <= rolloutPercentage {
 						nodes[nodeDuplicates[0]].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig)
+						queryExecutionReport.PlanDecisionMap[nodes[nodeDuplicates[0]].Path] = nodes[nodeDuplicates[0]].DataSourceID
 					} else {
 						// we assume only 2 duplicates
 						nodes[nodeDuplicates[1]].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig)
+						queryExecutionReport.PlanDecisionMap[nodes[nodeDuplicates[1]].Path] = nodes[nodeDuplicates[1]].DataSourceID
 					}
 				}
 			} else {
