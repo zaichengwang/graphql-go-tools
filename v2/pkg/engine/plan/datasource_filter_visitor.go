@@ -3,6 +3,7 @@ package plan
 import (
 	"fmt"
 	"math/rand"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -582,6 +583,7 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool,
 				// select the node based on rollout config
 				// if the random number is less than RolloutPercentage, select the node
 				if rolloutPercentage > 0 {
+					rand.Seed(time.Now().UnixNano())
 					randomNumber := rand.Intn(101)
 					if randomNumber <= rolloutPercentage {
 						nodes[nodeDuplicates[0]].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig)
