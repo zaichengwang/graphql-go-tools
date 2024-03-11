@@ -3,7 +3,9 @@ package plan
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astprinter"
@@ -69,7 +71,9 @@ func (p *Planner) SetDebugConfig(config DebugConfiguration) {
 	p.config.Debug = config
 }
 
-func (p *Planner) Plan(operation, definition *ast.Document, operationName string, report *operationreport.Report) (plan Plan) {
+func (p *Planner) Plan(operation, definition *ast.Document, operationName string, report *operationreport.Report,
+	queryExecutionReport *operationreport.QueryExecutionReport) (plan Plan) {
+	rand.Seed(time.Now().UnixNano())
 	p.selectOperation(operation, operationName, report)
 	if report.HasErrors() {
 		return
@@ -80,7 +84,7 @@ func (p *Planner) Plan(operation, definition *ast.Document, operationName string
 		p.config.DataSources[i].Hash()
 	}
 
-	p.findPlanningPaths(operation, definition, report)
+	p.findPlanningPaths(operation, definition, report, queryExecutionReport)
 	if report.HasErrors() {
 		return nil
 	}
@@ -145,8 +149,9 @@ func (p *Planner) Plan(operation, definition *ast.Document, operationName string
 	return p.planningVisitor.plan
 }
 
-func (p *Planner) findPlanningPaths(operation, definition *ast.Document, report *operationreport.Report) {
-	dsFilter := NewDataSourceFilter(operation, definition, report)
+func (p *Planner) findPlanningPaths(operation, definition *ast.Document, report *operationreport.Report,
+	queryExecutionReport *operationreport.QueryExecutionReport) {
+	dsFilter := NewDataSourceFilter(operation, definition, report, queryExecutionReport)
 
 	if p.config.Debug.PrintOperationTransformations {
 		p.debugMessage("Initial operation:")

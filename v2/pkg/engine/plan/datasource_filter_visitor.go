@@ -2,8 +2,8 @@ package plan
 
 import (
 	"fmt"
-
 	"github.com/pkg/errors"
+	"math/rand"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astvisitor"
@@ -13,16 +13,19 @@ import (
 const typeNameField = "__typename"
 
 type DataSourceFilter struct {
-	operation  *ast.Document
-	definition *ast.Document
-	report     *operationreport.Report
+	operation            *ast.Document
+	definition           *ast.Document
+	report               *operationreport.Report
+	queryExecutionReport *operationreport.QueryExecutionReport
 }
 
-func NewDataSourceFilter(operation, definition *ast.Document, report *operationreport.Report) *DataSourceFilter {
+func NewDataSourceFilter(operation, definition *ast.Document, report *operationreport.Report,
+	queryExecutionReport *operationreport.QueryExecutionReport) *DataSourceFilter {
 	return &DataSourceFilter{
-		operation:  operation,
-		definition: definition,
-		report:     report,
+		operation:            operation,
+		definition:           definition,
+		report:               report,
+		queryExecutionReport: queryExecutionReport,
 	}
 }
 
@@ -52,9 +55,25 @@ func (f *DataSourceFilter) findBestDataSourceSet(dataSources []DataSourceConfigu
 		return nil
 	}
 
-	nodes = selectUniqNodes(nodes)
-	nodes = selectDuplicateNodes(nodes, false)
-	nodes = selectDuplicateNodes(nodes, true)
+	nodes, hasDuplicates := selectUniqNodes(nodes)
+	print(hasDuplicates)
+	if hasDuplicates {
+		// assign datasource config to the nodes
+		// make datasource config to hash->config map
+		dsConfigMap := make(map[DSHash]DataSourceConfiguration)
+		for _, dsConfig := range dataSources {
+			dsConfigMap[dsConfig.hash] = dsConfig
+		}
+		for i := range nodes {
+			nodes[i].isPrimaryDataSource = dsConfigMap[nodes[i].DataSourceHash].IsPrimaryDataSource
+			nodes[i].rolloutPercentage = dsConfigMap[nodes[i].DataSourceHash].RolloutPercentage
+			nodes[i].isRolloutEnabled = dsConfigMap[nodes[i].DataSourceHash].IsRolloutEnabled
+			nodes[i].DataSourceID = dsConfigMap[nodes[i].DataSourceHash].ID
+		}
+
+	}
+	nodes = selectDuplicateNodes(nodes, false, f.queryExecutionReport)
+	nodes = selectDuplicateNodes(nodes, true, f.queryExecutionReport)
 
 	nodes = selectedNodes(nodes)
 
@@ -108,6 +127,15 @@ type NodeSuggestion struct {
 	onFragment                bool
 	selected                  bool
 	selectionReasons          []string
+
+	// Those are configs related to roll out feature
+	isPrimaryDataSource bool
+	// rolloutPercentage is the percentage of traffic that should be routed to this data source
+	rolloutPercentage int
+	// indicate if rollout is enabled
+	isRolloutEnabled bool
+
+	DataSourceID string
 }
 
 func (n *NodeSuggestion) appendSelectionReason(reason string) {
@@ -405,9 +433,12 @@ const (
 	ReasonStage2SameSourceNodeOfSelectedSibling         = "stage2: node on the same source as selected sibling"
 
 	ReasonStage3SelectAvailableNode = "stage3: select first available node"
+
+	ReasonStage3SelectBasedOnRolloutConfig = "stage3: select based on rollout config"
 )
 
-func selectUniqNodes(nodes NodeSuggestions) []NodeSuggestion {
+func selectUniqNodes(nodes NodeSuggestions) ([]NodeSuggestion, bool) {
+	hasDuplictes := false
 	for i := range nodes {
 		if nodes[i].selected {
 			continue
@@ -415,6 +446,7 @@ func selectUniqNodes(nodes NodeSuggestions) []NodeSuggestion {
 
 		isNodeUnique := nodes.isNodeUniq(i)
 		if !isNodeUnique {
+			hasDuplictes = true
 			continue
 		}
 
@@ -446,10 +478,11 @@ func selectUniqNodes(nodes NodeSuggestions) []NodeSuggestion {
 			}
 		}
 	}
-	return nodes
+	return nodes, hasDuplictes
 }
 
-func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestion {
+func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool,
+	queryExecutionReport *operationreport.QueryExecutionReport) []NodeSuggestion {
 	for i := range nodes {
 		if nodes[i].selected {
 			continue
@@ -507,7 +540,60 @@ func selectDuplicateNodes(nodes NodeSuggestions, secondRun bool) []NodeSuggestio
 		}
 
 		if secondRun {
-			nodes[i].selectWithReason(ReasonStage3SelectAvailableNode)
+			// Initialize rollout variables
+			rolloutEnabled := false
+			rolloutPercentageTotal := 0
+			primaryNodeIndex := -1
+			// Retrieve duplicates including the current node
+			nodeDuplicates = append(nodeDuplicates, i)
+			// Check if rollout is enabled and calculate total rollout percentage
+			for _, nodeIndex := range nodeDuplicates {
+				currentNode := nodes[nodeIndex]
+				if currentNode.isRolloutEnabled && (currentNode.rolloutPercentage > 0 || currentNode.isPrimaryDataSource) {
+					rolloutEnabled = true
+					rolloutPercentageTotal += currentNode.rolloutPercentage
+					if currentNode.isPrimaryDataSource {
+						primaryNodeIndex = nodeIndex
+					}
+				}
+			}
+
+			// Validate the number of duplicates
+			if len(nodeDuplicates) != 2 {
+				queryExecutionReport.PlanDecisionError = errors.New("more than 2 duplicates found " + fmt.Sprintf("%v", nodes[i].Path))
+				continue
+			}
+
+			// If only two nodes and rollout is enabled, proceed with selection
+			if rolloutEnabled && len(nodeDuplicates) == 2 {
+				if primaryNodeIndex != -1 {
+					// Assign the remaining rollout percentage to the primary node
+					nodes[primaryNodeIndex].rolloutPercentage = 100 - rolloutPercentageTotal
+				} else {
+					queryExecutionReport.QueryPlanningError = errors.New("primary node not found " + fmt.Sprintf("%v", nodes[i].Path))
+					continue
+				}
+
+				// Select a node based on rollout percentage
+				randomNumber := rand.Intn(101)
+				selectedNodeIndex := primaryNodeIndex
+				if randomNumber > nodes[primaryNodeIndex].rolloutPercentage {
+					// Select the non-primary node
+					for _, nodeIndex := range nodeDuplicates {
+						if nodeIndex != primaryNodeIndex {
+							selectedNodeIndex = nodeIndex
+							break
+						}
+					}
+				}
+
+				// Apply the selection
+				nodes[selectedNodeIndex].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig)
+				queryExecutionReport.PlanDecisionMap[nodes[selectedNodeIndex].Path] = nodes[selectedNodeIndex].DataSourceID
+			} else {
+				// Default selection when rollout is not enabled or there are not exactly two nodes
+				nodes[i].selectWithReason(ReasonStage3SelectAvailableNode)
+			}
 		}
 	}
 	return nodes

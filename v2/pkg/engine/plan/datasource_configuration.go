@@ -41,6 +41,13 @@ type DataSourceConfiguration struct {
 
 	hash           DSHash
 	ParsedDocument ast.Document
+	// The below configurations are used to setup the grey rollout
+	// used for ottergate data source
+	IsPrimaryDataSource bool
+	// RolloutPercentage is the percentage of traffic that should be routed to this data source
+	RolloutPercentage int
+	// indicate if rollout is enabled
+	IsRolloutEnabled bool
 }
 
 func (d *DataSourceConfiguration) Hash() DSHash {
