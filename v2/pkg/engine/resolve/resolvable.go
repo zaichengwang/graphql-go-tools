@@ -15,6 +15,7 @@ type Resolvable struct {
 	storage         *astjson.JSON
 	dataRoot        int
 	errorsRoot      int
+	extensionsRoot  int
 	variablesRoot   int
 	print           bool
 	out             io.Writer
@@ -49,7 +50,7 @@ func (r *Resolvable) Reset() {
 func (r *Resolvable) Init(ctx *Context, initialData []byte, operationType ast.OperationType) (err error) {
 	r.operationType = operationType
 	r.renameTypeNames = ctx.RenameTypeNames
-	r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(initialData)
+	r.dataRoot, r.errorsRoot, r.extensionsRoot, err = r.storage.InitResolvable(initialData, nil)
 	if err != nil {
 		return
 	}
@@ -67,12 +68,12 @@ func (r *Resolvable) InitSubscription(ctx *Context, initialData []byte, postProc
 	}
 	switch {
 	case postProcessing.SelectResponseErrorsPath == nil && postProcessing.SelectResponseDataPath == nil:
-		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(initialData)
+		r.dataRoot, r.errorsRoot, r.extensionsRoot, err = r.storage.InitResolvable(initialData, nil)
 		if err != nil {
 			return
 		}
 	case postProcessing.SelectResponseErrorsPath == nil && postProcessing.SelectResponseDataPath != nil:
-		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(nil)
+		r.dataRoot, r.errorsRoot, r.extensionsRoot, err = r.storage.InitResolvable(nil, nil)
 		if err != nil {
 			return
 		}
@@ -86,7 +87,7 @@ func (r *Resolvable) InitSubscription(ctx *Context, initialData []byte, postProc
 		}
 		r.storage.MergeNodes(r.dataRoot, data)
 	case postProcessing.SelectResponseErrorsPath != nil && postProcessing.SelectResponseDataPath == nil:
-		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(nil)
+		r.dataRoot, r.errorsRoot, r.extensionsRoot, err = r.storage.InitResolvable(nil, nil)
 		if err != nil {
 			return
 		}
@@ -100,7 +101,7 @@ func (r *Resolvable) InitSubscription(ctx *Context, initialData []byte, postProc
 		}
 		r.storage.MergeArrays(r.errorsRoot, errors)
 	case postProcessing.SelectResponseErrorsPath != nil && postProcessing.SelectResponseDataPath != nil:
-		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(nil)
+		r.dataRoot, r.errorsRoot, r.extensionsRoot, err = r.storage.InitResolvable(nil, nil)
 		if err != nil {
 			return
 		}
@@ -153,6 +154,16 @@ func (r *Resolvable) Resolve(root *Object, out io.Writer) error {
 	} else {
 		r.printData(root)
 	}
+
+	if r.hasExtension() {
+		r.printBytes(comma)
+		r.printBytes(quote)
+		r.printBytes(literalExtensions)
+		r.printBytes(quote)
+		r.printBytes(colon)
+		r.printNode(r.extensionsRoot)
+	}
+
 	r.printBytes(rBrace)
 	return r.printErr
 }
@@ -195,6 +206,11 @@ func (r *Resolvable) hasData() bool {
 		return false
 	}
 	return len(r.storage.Nodes[r.dataRoot].ObjectFields) > 0
+}
+
+func (r *Resolvable) hasExtension() bool {
+	return r.storage.NodeIsDefined(r.extensionsRoot) &&
+		len(r.storage.Nodes[r.extensionsRoot].ObjectFields) > 0
 }
 
 func (r *Resolvable) printBytes(b []byte) {

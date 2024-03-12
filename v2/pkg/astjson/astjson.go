@@ -290,7 +290,7 @@ func (j *JSON) Reset() {
 	j.Nodes = j.Nodes[:0]
 }
 
-func (j *JSON) InitResolvable(initialData []byte) (dataRoot, errorsRoot int, err error) {
+func (j *JSON) InitResolvable(initialData []byte, initialExtensions []byte) (dataRoot, errorsRoot, extensionsRoot int, err error) {
 	j.RootNode = j.appendNode(Node{
 		Kind:         NodeKindObject,
 		ObjectFields: j.getIntSlice(),
@@ -299,19 +299,33 @@ func (j *JSON) InitResolvable(initialData []byte) (dataRoot, errorsRoot int, err
 		Kind:         NodeKindObject,
 		ObjectFields: j.getIntSlice(),
 	})
+	extensionsRoot = j.appendNode(Node{
+		Kind:         NodeKindObject,
+		ObjectFields: j.getIntSlice(),
+	})
 	if len(initialData) != 0 {
 		mergeWithDataRoot, err := j.AppendObject(initialData)
 		if err != nil {
-			return -1, -1, err
+			return -1, -1, -1, err
 		}
 		j.MergeNodes(dataRoot, mergeWithDataRoot)
 	}
+
+	if len(initialExtensions) != 0 {
+		mergeWithExtensionsRoot, err := j.AppendObject(initialExtensions)
+		if err != nil {
+			return -1, -1, -1, err
+		}
+		j.MergeNodes(extensionsRoot, mergeWithExtensionsRoot)
+	}
+
 	errorsRoot = j.appendNode(Node{
 		Kind:        NodeKindArray,
 		ArrayValues: j.getIntSlice(),
 	})
 	dataStart, dataEnd := j.appendString("data")
 	errorsStart, errorsEnd := j.appendString("errors")
+	extensionsStart, extensionsEnd := j.appendString("extensions")
 	dataField := j.appendNode(Node{
 		Kind:             NodeKindObjectField,
 		ObjectFieldValue: dataRoot,
@@ -324,9 +338,16 @@ func (j *JSON) InitResolvable(initialData []byte) (dataRoot, errorsRoot int, err
 		keyStart:         errorsStart,
 		keyEnd:           errorsEnd,
 	})
+	extensionsField := j.appendNode(Node{
+		Kind:             NodeKindObjectField,
+		ObjectFieldValue: extensionsRoot,
+		keyStart:         extensionsStart,
+		keyEnd:           extensionsEnd,
+	})
 	j.Nodes[j.RootNode].ObjectFields = append(j.Nodes[j.RootNode].ObjectFields, errorsField)
 	j.Nodes[j.RootNode].ObjectFields = append(j.Nodes[j.RootNode].ObjectFields, dataField)
-	return dataRoot, errorsRoot, nil
+	j.Nodes[j.RootNode].ObjectFields = append(j.Nodes[j.RootNode].ObjectFields, extensionsField)
+	return dataRoot, errorsRoot, extensionsRoot, nil
 }
 
 type PathElement struct {
