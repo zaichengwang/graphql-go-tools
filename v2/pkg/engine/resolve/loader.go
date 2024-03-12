@@ -319,6 +319,13 @@ func (l *Loader) mergeResult(res *result, items []int) error {
 	if err != nil {
 		return errors.WithStack(err)
 	}
+
+	// append extensions
+	extensionNode := l.data.Get(node, []string{"extensions"})
+	if l.data.NodeIsDefined(extensionNode) {
+		l.mergeExtensions(extensionNode)
+	}
+
 	if res.postProcessing.SelectResponseErrorsPath != nil {
 		ref := l.data.Get(node, res.postProcessing.SelectResponseErrorsPath)
 		l.mergeErrors(ref)
@@ -329,12 +336,6 @@ func (l *Loader) mergeResult(res *result, items []int) error {
 			// no data
 			return nil
 		}
-	}
-
-	// append extensions
-	extensionNode := l.data.Get(node, []string{"extensions"})
-	if l.data.NodeIsDefined(extensionNode) {
-		l.mergeExtensions(extensionNode)
 	}
 
 	withPostProcessing := res.postProcessing.ResponseTemplate != nil
