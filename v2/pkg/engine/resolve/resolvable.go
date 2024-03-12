@@ -49,7 +49,7 @@ func (r *Resolvable) Reset() {
 func (r *Resolvable) Init(ctx *Context, initialData []byte, operationType ast.OperationType) (err error) {
 	r.operationType = operationType
 	r.renameTypeNames = ctx.RenameTypeNames
-	r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(initialData)
+	r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(initialData, nil)
 	if err != nil {
 		return
 	}
@@ -67,12 +67,12 @@ func (r *Resolvable) InitSubscription(ctx *Context, initialData []byte, postProc
 	}
 	switch {
 	case postProcessing.SelectResponseErrorsPath == nil && postProcessing.SelectResponseDataPath == nil:
-		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(initialData)
+		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(initialData, nil)
 		if err != nil {
 			return
 		}
 	case postProcessing.SelectResponseErrorsPath == nil && postProcessing.SelectResponseDataPath != nil:
-		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(nil)
+		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(nil, nil)
 		if err != nil {
 			return
 		}
@@ -86,7 +86,7 @@ func (r *Resolvable) InitSubscription(ctx *Context, initialData []byte, postProc
 		}
 		r.storage.MergeNodes(r.dataRoot, data)
 	case postProcessing.SelectResponseErrorsPath != nil && postProcessing.SelectResponseDataPath == nil:
-		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(nil)
+		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(nil, nil)
 		if err != nil {
 			return
 		}
@@ -100,7 +100,7 @@ func (r *Resolvable) InitSubscription(ctx *Context, initialData []byte, postProc
 		}
 		r.storage.MergeArrays(r.errorsRoot, errors)
 	case postProcessing.SelectResponseErrorsPath != nil && postProcessing.SelectResponseDataPath != nil:
-		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(nil)
+		r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(nil, nil)
 		if err != nil {
 			return
 		}
