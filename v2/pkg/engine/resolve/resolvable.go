@@ -161,9 +161,7 @@ func (r *Resolvable) Resolve(root *Object, out io.Writer) error {
 		r.printBytes(literalExtensions)
 		r.printBytes(quote)
 		r.printBytes(colon)
-		r.printBytes(lBrace)
 		r.printNode(r.extensionsRoot)
-		r.printBytes(rBrace)
 	}
 
 	r.printBytes(rBrace)
