@@ -162,9 +162,7 @@ func (r *Resolvable) Resolve(root *Object, out io.Writer) error {
 		r.printBytes(quote)
 		r.printBytes(colon)
 		r.printBytes(lBrace)
-		r.print = true
-		_ = r.walkObject(root, r.extensionsRoot)
-		r.print = false
+		r.printNode(r.extensionsRoot)
 		r.printBytes(rBrace)
 	}
 
