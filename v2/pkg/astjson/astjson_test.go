@@ -38,7 +38,7 @@ func TestJSON_ParsePrintArray(t *testing.T) {
 
 func TestJSON_InitResolvable(t *testing.T) {
 	js := &JSON{}
-	dataRoot, errorsRoot, err := js.InitResolvable(nil, nil)
+	dataRoot, errorsRoot, _, err := js.InitResolvable(nil, nil)
 	assert.NoError(t, err)
 	assert.NotEqual(t, -1, dataRoot)
 	assert.NotEqual(t, -1, errorsRoot)
@@ -50,7 +50,7 @@ func TestJSON_InitResolvable(t *testing.T) {
 	assert.Equal(t, `[]`, errors)
 
 	js = &JSON{}
-	dataRoot, errorsRoot, err = js.InitResolvable([]byte(`{"name":"Jens"}`), []byte(`{"traceId":"123"}`))
+	dataRoot, errorsRoot, _, err = js.InitResolvable([]byte(`{"name":"Jens"}`), []byte(`{"traceId":"123"}`))
 	assert.NoError(t, err)
 	assert.NotEqual(t, -1, dataRoot)
 	assert.NotEqual(t, -1, errorsRoot)
@@ -65,7 +65,7 @@ func TestJSON_InitResolvable(t *testing.T) {
 
 func TestJSON_MergeArrays(t *testing.T) {
 	js := &JSON{}
-	dataRoot, errorsRoot, err := js.InitResolvable([]byte(`{"name":"Jens"}`), nil)
+	dataRoot, errorsRoot, _, err := js.InitResolvable([]byte(`{"name":"Jens"}`), nil)
 	assert.NoError(t, err)
 	assert.NotEqual(t, -1, dataRoot)
 	assert.NotEqual(t, -1, errorsRoot)
