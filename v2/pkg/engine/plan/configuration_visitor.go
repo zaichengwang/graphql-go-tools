@@ -467,7 +467,7 @@ func (c *configurationVisitor) planWithExistingPlanners(ref int, typeName, field
 			}
 			// on the second run we need to process only new fields added by the first run
 			// since we already have it planned, remove it from missing path
-			c.removeMissingPath(currentPath)
+			//c.removeMissingPath(currentPath)
 			return plannerIdx, true
 		}
 

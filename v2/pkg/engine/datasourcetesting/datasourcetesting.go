@@ -40,7 +40,8 @@ func RunTest(definition, operation, operationName string, expectedPlan plan.Plan
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		p := plan.NewPlanner(ctx, config)
-		actualPlan := p.Plan(&op, &def, operationName, &report)
+		oprport := operationreport.QueryExecutionReport{}
+		actualPlan := p.Plan(&op, &def, operationName, &report, &oprport)
 		if report.HasErrors() {
 			_, err := astprinter.PrintStringIndent(&def, nil, "  ")
 			if err != nil {
