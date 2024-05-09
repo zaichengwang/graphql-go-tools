@@ -119,6 +119,203 @@ type FederationEngineConfigFactory struct {
 	subgraphsConfigs          []SubgraphConfiguration
 }
 
+func (f *FederationEngineConfigFactory) BuildEngineConfigurationWithHeader(header http.Header) (conf Configuration, err error) {
+
+	intermediateConfig, err := f.compose()
+	if err != nil {
+		return Configuration{}, err
+	}
+
+	plannerConfiguration, err := f.createPlannerConfigurationWithHeaders(intermediateConfig, header)
+	if err != nil {
+		return Configuration{}, err
+	}
+	plannerConfiguration.DefaultFlushIntervalMillis = DefaultFlushIntervalInMilliseconds
+
+	schemaSDL := intermediateConfig.EngineConfig.GraphqlSchema
+
+	schema, err := graphql.NewSchemaFromString(schemaSDL)
+	if err != nil {
+		return Configuration{}, err
+	}
+
+	conf = Configuration{
+		plannerConfig: *plannerConfiguration,
+		schema:        schema,
+	}
+
+	if f.customResolveMap != nil {
+		conf.SetCustomResolveMap(f.customResolveMap)
+	}
+
+	return conf, nil
+}
+
+func (f *FederationEngineConfigFactory) createPlannerConfigurationWithHeaders(routerConfig *nodev1.RouterConfig,
+	header http.Header) (*plan.Configuration, error) {
+	var (
+		outConfig plan.Configuration
+	)
+	// attach field usage information to the plan
+	engineConfig := routerConfig.EngineConfig
+	// outConfig.IncludeInfo = l.includeInfo
+	outConfig.DefaultFlushIntervalMillis = engineConfig.DefaultFlushInterval
+	for _, configuration := range engineConfig.FieldConfigurations {
+		var args []plan.ArgumentConfiguration
+		for _, argumentConfiguration := range configuration.ArgumentsConfiguration {
+			arg := plan.ArgumentConfiguration{
+				Name: argumentConfiguration.Name,
+			}
+			switch argumentConfiguration.SourceType {
+			case nodev1.ArgumentSource_FIELD_ARGUMENT:
+				arg.SourceType = plan.FieldArgumentSource
+			case nodev1.ArgumentSource_OBJECT_FIELD:
+				arg.SourceType = plan.ObjectFieldSource
+			}
+			args = append(args, arg)
+		}
+		outConfig.Fields = append(outConfig.Fields, plan.FieldConfiguration{
+			TypeName:  configuration.TypeName,
+			FieldName: configuration.FieldName,
+			Arguments: args,
+		})
+	}
+
+	for _, configuration := range engineConfig.TypeConfigurations {
+		outConfig.Types = append(outConfig.Types, plan.TypeConfiguration{
+			TypeName: configuration.TypeName,
+			RenameTo: configuration.RenameTo,
+		})
+	}
+
+	for _, ds := range engineConfig.DatasourceConfigurations {
+		if ds.Kind != nodev1.DataSourceKind_GRAPHQL {
+			return nil, fmt.Errorf("invalid datasource kind %q", ds.Kind)
+		}
+
+		dataSource, err := f.subgraphDataSourceConfigurationWithHeaders(engineConfig, ds, header)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create data source configuration for data source %s: %w", ds.Id, err)
+		}
+
+		outConfig.DataSources = append(outConfig.DataSources, dataSource)
+	}
+
+	return &outConfig, nil
+}
+
+func (f *FederationEngineConfigFactory) subgraphDataSourceConfigurationWithHeaders(engineConfig *nodev1.EngineConfiguration,
+	in *nodev1.DataSourceConfiguration, headerToAdd http.Header) (plan.DataSource, error) {
+	var out plan.DataSource
+
+	factory, err := f.graphqlDataSourceFactory()
+	if err != nil {
+		return nil, err
+	}
+
+	header := http.Header{}
+	for s, httpHeader := range in.CustomGraphql.Fetch.Header {
+		for _, value := range httpHeader.Values {
+			header.Add(s, LoadStringVariable(value))
+		}
+	}
+
+	for s, httpHeader := range headerToAdd {
+		for _, value := range httpHeader {
+			header.Add(s, value)
+		}
+	}
+
+	fetchUrl := LoadStringVariable(in.CustomGraphql.Fetch.GetUrl())
+
+	subscriptionUrl := LoadStringVariable(in.CustomGraphql.Subscription.Url)
+	if subscriptionUrl == "" {
+		subscriptionUrl = fetchUrl
+	}
+
+	customScalarTypeFields := make([]graphql_datasource.SingleTypeField, len(in.CustomGraphql.CustomScalarTypeFields))
+	for i, v := range in.CustomGraphql.CustomScalarTypeFields {
+		customScalarTypeFields[i] = graphql_datasource.SingleTypeField{
+			TypeName:  v.TypeName,
+			FieldName: v.FieldName,
+		}
+	}
+
+	graphqlSchema, err := f.LoadInternedString(engineConfig, in.CustomGraphql.GetUpstreamSchema())
+	if err != nil {
+		return nil, fmt.Errorf("could not load GraphQL schema for data source %s: %w", in.Id, err)
+	}
+
+	var subscriptionUseSSE bool
+	var subscriptionSSEMethodPost bool
+	if in.CustomGraphql.Subscription.Protocol != nil {
+		switch *in.CustomGraphql.Subscription.Protocol {
+		case common.GraphQLSubscriptionProtocol_GRAPHQL_SUBSCRIPTION_PROTOCOL_WS:
+			subscriptionUseSSE = false
+			subscriptionSSEMethodPost = false
+		case common.GraphQLSubscriptionProtocol_GRAPHQL_SUBSCRIPTION_PROTOCOL_SSE:
+			subscriptionUseSSE = true
+			subscriptionSSEMethodPost = false
+		case common.GraphQLSubscriptionProtocol_GRAPHQL_SUBSCRIPTION_PROTOCOL_SSE_POST:
+			subscriptionUseSSE = true
+			subscriptionSSEMethodPost = true
+		}
+	} else {
+		// Old style config
+		if in.CustomGraphql.Subscription.UseSSE != nil {
+			subscriptionUseSSE = *in.CustomGraphql.Subscription.UseSSE
+		}
+	}
+	// dataSourceRules := FetchURLRules(&routerEngineConfig.Headers, routerConfig.Subgraphs, subscriptionUrl)
+	// forwardedClientHeaders, forwardedClientRegexps, err := PropagatedHeaders(dataSourceRules)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error parsing header rules for data source %s: %w", in.Id, err)
+	// }
+
+	schemaConfiguration, err := graphql_datasource.NewSchemaConfiguration(
+		graphqlSchema,
+		&graphql_datasource.FederationConfiguration{
+			Enabled:    in.CustomGraphql.Federation.Enabled,
+			ServiceSDL: in.CustomGraphql.Federation.ServiceSdl,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating schema configuration for data source %s: %w", in.Id, err)
+	}
+
+	customConfiguration, err := graphql_datasource.NewConfiguration(graphql_datasource.ConfigurationInput{
+		Fetch: &graphql_datasource.FetchConfiguration{
+			URL:    fetchUrl,
+			Method: in.CustomGraphql.Fetch.Method.String(),
+			Header: header,
+		},
+		Subscription: &graphql_datasource.SubscriptionConfiguration{
+			URL:           subscriptionUrl,
+			UseSSE:        subscriptionUseSSE,
+			SSEMethodPost: subscriptionSSEMethodPost,
+			// ForwardedClientHeaderNames:              forwardedClientHeaders,
+			// ForwardedClientHeaderRegularExpressions: forwardedClientRegexps,
+		},
+		SchemaConfiguration:    schemaConfiguration,
+		CustomScalarTypeFields: customScalarTypeFields,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error creating custom configuration for data source %s: %w", in.Id, err)
+	}
+
+	out, err = plan.NewDataSourceConfiguration[graphql_datasource.Configuration](
+		in.Id,
+		factory,
+		f.dataSourceMetaData(in),
+		customConfiguration,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating data source configuration for data source %s: %w", in.Id, err)
+	}
+
+	return out, nil
+}
+
 func (f *FederationEngineConfigFactory) BuildEngineConfiguration() (conf Configuration, err error) {
 
 	intermediateConfig, err := f.compose()
