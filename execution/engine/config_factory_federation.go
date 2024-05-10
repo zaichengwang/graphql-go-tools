@@ -119,14 +119,30 @@ type FederationEngineConfigFactory struct {
 	subgraphsConfigs          []SubgraphConfiguration
 }
 
-func (f *FederationEngineConfigFactory) BuildEngineConfigurationWithHeader(header http.Header) (conf Configuration, err error) {
-
-	intermediateConfig, err := f.compose()
+func (f *FederationEngineConfigFactory) ComposeRouterConfigString() (string, error) {
+	routerConfig, err := f.compose()
 	if err != nil {
+		return "", err
+	}
+
+	routerConfigBytes, err := protojson.Marshal(routerConfig)
+	if err != nil {
+		return "", err
+	}
+
+	return string(routerConfigBytes), nil
+
+}
+
+func (f *FederationEngineConfigFactory) BuildEngineConfigurationWithHeader(routerConfigString string,
+	header http.Header) (conf Configuration, err error) {
+
+	var intermediateConfig nodev1.RouterConfig
+	if err := protojson.Unmarshal([]byte(routerConfigString), &intermediateConfig); err != nil {
 		return Configuration{}, err
 	}
 
-	plannerConfiguration, err := f.createPlannerConfigurationWithHeaders(intermediateConfig, header)
+	plannerConfiguration, err := f.createPlannerConfigurationWithHeaders(&intermediateConfig, header)
 	if err != nil {
 		return Configuration{}, err
 	}
