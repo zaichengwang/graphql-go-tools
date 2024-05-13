@@ -133,7 +133,9 @@ func NewExecutionEngine(ctx context.Context, logger abstractlogger.Logger, engin
 		config:  engineConfig,
 		planner: planner,
 		resolver: resolve.New(ctx, resolve.ResolverOptions{
-			MaxConcurrency: 1024,
+			MaxConcurrency:               1024,
+			PropagateSubgraphErrors:      true,
+			PropagateSubgraphStatusCodes: true,
 		}),
 		internalExecutionContextPool: sync.Pool{
 			New: func() interface{} {
