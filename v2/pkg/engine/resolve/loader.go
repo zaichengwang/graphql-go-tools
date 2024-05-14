@@ -43,12 +43,13 @@ func IsIntrospectionDataSource(dataSourceID string) bool {
 }
 
 type Loader struct {
-	data       *astjson.JSON
-	dataRoot   int
-	errorsRoot int
-	ctx        *Context
-	path       []string
-	info       *GraphQLResponseInfo
+	data           *astjson.JSON
+	dataRoot       int
+	errorsRoot     int
+	extensionsRoot int
+	ctx            *Context
+	path           []string
+	info           *GraphQLResponseInfo
 
 	propagateSubgraphErrors      bool
 	propagateSubgraphStatusCodes bool
@@ -60,6 +61,7 @@ func (l *Loader) Free() {
 	l.data = nil
 	l.dataRoot = -1
 	l.errorsRoot = -1
+	l.extensionsRoot = -1
 	l.path = l.path[:0]
 }
 
@@ -67,6 +69,7 @@ func (l *Loader) LoadGraphQLResponseData(ctx *Context, response *GraphQLResponse
 	l.data = resolvable.storage
 	l.dataRoot = resolvable.dataRoot
 	l.errorsRoot = resolvable.errorsRoot
+	l.extensionsRoot = resolvable.extensionsRoot
 	l.ctx = ctx
 	l.info = response.Info
 	return l.walkNode(response.Data, []int{resolvable.dataRoot})
@@ -375,6 +378,17 @@ func (l *Loader) loadFetch(ctx context.Context, fetch Fetch, items []int, res *r
 	return nil
 }
 
+func (l *Loader) mergeExtensions(ref int) {
+	if ref == -1 {
+		return
+	}
+	if l.extensionsRoot == -1 {
+		l.extensionsRoot = ref
+		return
+	}
+	l.data.MergeNodes(l.extensionsRoot, ref)
+}
+
 func (l *Loader) mergeResult(res *result, items []int) error {
 	defer pool.BytesBuffer.Put(res.out)
 	if res.err != nil {
@@ -419,6 +433,12 @@ func (l *Loader) mergeResult(res *result, items []int) error {
 		return l.renderErrorsFailedToFetch(res, failedToFetchInvalidJSON)
 	}
 
+	// append extensions
+	extensionNode := l.data.Get(node, []string{"extensions"})
+	if l.data.NodeIsDefined(extensionNode) {
+		l.mergeExtensions(extensionNode)
+	}
+
 	// error handling
 	if res.postProcessing.SelectResponseErrorsPath != nil {
 		// look for errors in the response and merge them into the errors array
@@ -437,6 +457,7 @@ func (l *Loader) mergeResult(res *result, items []int) error {
 			return nil
 		}
 	}
+
 	withPostProcessing := res.postProcessing.ResponseTemplate != nil
 	if withPostProcessing && len(items) <= 1 {
 		postProcessed := pool.BytesBuffer.Get()
