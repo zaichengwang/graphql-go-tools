@@ -23,6 +23,7 @@ type Resolvable struct {
 	storage            *astjson.JSON
 	dataRoot           int
 	errorsRoot         int
+	extensionsRoot     int
 	variablesRoot      int
 	print              bool
 	out                io.Writer
@@ -82,7 +83,7 @@ func (r *Resolvable) Init(ctx *Context, initialData []byte, operationType ast.Op
 	r.ctx = ctx
 	r.operationType = operationType
 	r.renameTypeNames = ctx.RenameTypeNames
-	r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(initialData)
+	r.dataRoot, r.errorsRoot, r.extensionsRoot, err = r.storage.InitResolvable(initialData, nil)
 	if err != nil {
 		return
 	}
@@ -102,7 +103,7 @@ func (r *Resolvable) InitSubscription(ctx *Context, initialData []byte, postProc
 			return
 		}
 	}
-	r.dataRoot, r.errorsRoot, err = r.storage.InitResolvable(nil)
+	r.dataRoot, r.errorsRoot, r.extensionsRoot, err = r.storage.InitResolvable(nil, nil)
 	if err != nil {
 		return
 	}
@@ -239,6 +240,9 @@ func (r *Resolvable) printExtensions(ctx context.Context, root *Object) error {
 		}
 	}
 
+	// print extension from data response
+	r.printNode(r.extensionsRoot)
+
 	r.printBytes(rBrace)
 	return nil
 }
@@ -288,7 +292,8 @@ func (r *Resolvable) hasExtensions() bool {
 	if r.ctx.TracingOptions.Enable && r.ctx.TracingOptions.IncludeTraceOutputInResponseExtensions {
 		return true
 	}
-	return false
+	return r.storage.NodeIsDefined(r.extensionsRoot) &&
+		len(r.storage.Nodes[r.extensionsRoot].ObjectFields) > 0
 }
 
 func (r *Resolvable) WroteErrorsWithoutData() bool {
@@ -308,6 +313,11 @@ func (r *Resolvable) hasData() bool {
 		return false
 	}
 	return len(r.storage.Nodes[r.dataRoot].ObjectFields) > 0
+}
+
+func (r *Resolvable) hasExtension() bool {
+	return r.storage.NodeIsDefined(r.extensionsRoot) &&
+		len(r.storage.Nodes[r.extensionsRoot].ObjectFields) > 0
 }
 
 func (r *Resolvable) printBytes(b []byte) {
