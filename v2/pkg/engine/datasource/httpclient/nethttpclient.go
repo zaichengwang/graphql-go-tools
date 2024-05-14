@@ -97,6 +97,12 @@ func Do(client *http.Client, ctx context.Context, requestInput []byte, out io.Wr
 	if err != nil {
 		return err
 	}
+	if response.StatusCode >= 400 {
+		return &HttpError{
+			StatusCode: response.StatusCode,
+			Message:    http.StatusText(response.StatusCode),
+		}
+	}
 	defer response.Body.Close()
 
 	respReader, err := respBodyReader(request, response)
