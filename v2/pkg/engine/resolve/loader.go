@@ -382,7 +382,7 @@ func (l *Loader) loadFetch(ctx context.Context, fetch Fetch, items []int, res *r
 func (l *Loader) mergeResult(res *result, items []int) error {
 	defer pool.BytesBuffer.Put(res.out)
 	if res.err != nil {
-		return l.renderErrorsFailedToFetch(res, failedToFetchNoReason)
+		return l.renderErrorsFailedToFetch(res, res.err.Error())
 	}
 	if res.authorizationRejected {
 		err := l.renderAuthorizationRejectedErrors(res)
@@ -787,16 +787,31 @@ func (l *Loader) renderErrorsFailedToFetch(res *result, reason string) error {
 }
 
 func (l *Loader) renderSubgraphBaseError(subgraphName, path, reason string) string {
+	type ErrorMessage struct {
+		Message string `json:"message"`
+	}
+
 	if subgraphName == "" {
 		if reason == "" {
-			return fmt.Sprintf(`{"message":"Failed to fetch from Subgraph at Path '%s'."}`, path)
+			errMsg := ErrorMessage{Message: fmt.Sprintf("Failed to fetch from Subgraph at Path '%s'.", path)}
+			jsonBytes, _ := json.Marshal(errMsg)
+			return string(jsonBytes)
 		}
-		return fmt.Sprintf(`{"message":"Failed to fetch from Subgraph at Path '%s', Reason: %s."}`, path, reason)
+
+		errMsg := ErrorMessage{Message: fmt.Sprintf("Failed to fetch from Subgraph at Path '%s', Reason: %s.", path, reason)}
+		jsonBytes, _ := json.Marshal(errMsg)
+		return string(jsonBytes)
 	}
+
 	if reason == "" {
-		return fmt.Sprintf(`{"message":"Failed to fetch from Subgraph '%s' at Path '%s'."}`, subgraphName, path)
+		errMsg := ErrorMessage{Message: fmt.Sprintf("Failed to fetch from Subgraph '%s' at Path '%s'.", subgraphName, path)}
+		jsonBytes, _ := json.Marshal(errMsg)
+		return string(jsonBytes)
 	}
-	return fmt.Sprintf(`{"message":"Failed to fetch from Subgraph '%s' at Path '%s', Reason: %s."}`, subgraphName, path, reason)
+
+	errMsg := ErrorMessage{Message: fmt.Sprintf("Failed to fetch from Subgraph '%s' at Path '%s', Reason: %s.", subgraphName, path, reason)}
+	jsonBytes, _ := json.Marshal(errMsg)
+	return string(jsonBytes)
 }
 
 func (l *Loader) renderAuthorizationRejectedErrors(res *result) error {
