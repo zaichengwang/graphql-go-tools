@@ -180,7 +180,7 @@ func Do(client *http.Client, ctx context.Context, requestInput []byte, out io.Wr
 	if err != nil {
 		return err
 	}
-	responseWithTraceExtension, err := jsonparser.Set(buf.Bytes(), trace, "extensions", "trace")
+	responseWithTraceExtension, err := jsonparser.Set(buf.Bytes(), trace, "httpExtensions", "trace")
 	if err != nil {
 		return err
 	}

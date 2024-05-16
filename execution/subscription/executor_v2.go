@@ -64,8 +64,8 @@ func (e *ExecutorV2) Execute(writer resolve.SubscriptionResponseWriter) error {
 	case *InitialHttpRequestContext:
 		options = append(options, engine.WithAdditionalHttpHeaders(ctx.Request.Header))
 	}
-
-	return e.engine.Execute(e.context, e.operation, writer, options...)
+	err, _ := e.engine.Execute(e.context, e.operation, writer, options...)
+	return err
 }
 
 func (e *ExecutorV2) OperationType() ast.OperationType {

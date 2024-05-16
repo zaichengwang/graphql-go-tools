@@ -46,7 +46,7 @@ func (g *GraphQLHTTPRequestHandler) handleHTTP(w http.ResponseWriter, r *http.Re
 
 	buf := bytes.NewBuffer(make([]byte, 0, 4096))
 	resultWriter := graphql.NewEngineResultWriterFromBuffer(buf)
-	if err = g.engine.Execute(r.Context(), &gqlRequest, &resultWriter, opts...); err != nil {
+	if err, _ = g.engine.Execute(r.Context(), &gqlRequest, &resultWriter, opts...); err != nil {
 		g.log.Error("engine.Execute", log.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return

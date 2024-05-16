@@ -27,6 +27,8 @@ type Context struct {
 	rateLimiter RateLimiter
 
 	subgraphErrors error
+
+	Trace TraceNode
 }
 
 type AuthorizationDeny struct {
@@ -169,6 +171,7 @@ type TraceInfo struct {
 	NormalizeStats PhaseStats `json:"normalize_stats"`
 	ValidateStats  PhaseStats `json:"validate_stats"`
 	PlannerStats   PhaseStats `json:"planner_stats"`
+	ResolveStats   PhaseStats `json:"resolve_stats"`
 	debug          bool
 }
 
@@ -252,4 +255,12 @@ func SetPlannerStats(ctx context.Context, stats PhaseStats) {
 		return
 	}
 	info.PlannerStats = SetDebugStats(info, stats, 4)
+}
+
+func SetResolveStats(ctx context.Context, stats PhaseStats) {
+	info := GetTraceInfo(ctx)
+	if info == nil {
+		return
+	}
+	info.ResolveStats = SetDebugStats(info, stats, 6)
 }

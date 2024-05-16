@@ -195,6 +195,7 @@ type DataSourceLoadTrace struct {
 	LoadSkipped                bool            `json:"load_skipped"`
 	LoadStats                  *LoadStats      `json:"load_stats,omitempty"`
 	Path                       string          `json:"-"`
+	HttpCallData               json.RawMessage `json:"http_call_data,omitempty"`
 }
 
 type LoadStats struct {

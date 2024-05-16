@@ -227,7 +227,7 @@ func TestExecutionEngine_Execute(t *testing.T) {
 			resultWriter := graphql.NewEngineResultWriter()
 			execCtx, execCtxCancel := context.WithCancel(context.Background())
 			defer execCtxCancel()
-			err = engine.Execute(execCtx, &operation, &resultWriter, testCase.engineOptions...)
+			err, _ = engine.Execute(execCtx, &operation, &resultWriter, testCase.engineOptions...)
 			actualResponse := resultWriter.String()
 			assert.Equal(t, testCase.expectedResponse, actualResponse)
 
@@ -745,7 +745,7 @@ func TestExecutionEngine_Execute(t *testing.T) {
 				},
 			},
 		},
-		expectedResponse: `{"errors":[{"message":"Failed to fetch from Subgraph at Path 'query'."}],"data":null}`,
+		expectedResponse: `{"errors":[{"message":"Failed to fetch from Subgraph at Path 'query'.","extensions":{"errors":[{"message":"could not render fetch input","path":[]}]}}],"data":null}`,
 	}))
 
 	t.Run("execute operation and apply input coercion for lists without variables", runWithoutError(ExecutionEngineTestCase{
@@ -1573,7 +1573,8 @@ func BenchmarkIntrospection(b *testing.B) {
 
 	writer := graphql.NewEngineResultWriter()
 	engine := newEngine()
-	require.NoError(b, engine.Execute(ctx, &req, &writer))
+	err, _ := engine.Execute(ctx, &req, &writer)
+	require.NoError(b, err)
 	require.Equal(b, expectedResponse, writer.Bytes())
 
 	pool := sync.Pool{
@@ -1590,7 +1591,8 @@ func BenchmarkIntrospection(b *testing.B) {
 		for pb.Next() {
 			bc := pool.Get().(*benchCase)
 			bc.writer.Reset()
-			require.NoError(b, bc.engine.Execute(ctx, &req, bc.writer))
+			err, _ := bc.engine.Execute(ctx, &req, bc.writer)
+			require.NoError(b, err)
 			if !bytes.Equal(expectedResponse, bc.writer.Bytes()) {
 				require.Equal(b, string(expectedResponse), bc.writer.String())
 			}
@@ -1661,7 +1663,8 @@ func BenchmarkExecutionEngine(b *testing.B) {
 
 	writer := graphql.NewEngineResultWriter()
 	engine := newEngine()
-	require.NoError(b, engine.Execute(ctx, &req, &writer))
+	err, _ := engine.Execute(ctx, &req, &writer)
+	require.NoError(b, err)
 	require.Equal(b, "{\"data\":{\"hello\":\"world\"}}", writer.String())
 
 	pool := sync.Pool{
@@ -1678,7 +1681,7 @@ func BenchmarkExecutionEngine(b *testing.B) {
 		for pb.Next() {
 			bc := pool.Get().(*benchCase)
 			bc.writer.Reset()
-			_ = bc.engine.Execute(ctx, &req, bc.writer)
+			_, _ = bc.engine.Execute(ctx, &req, bc.writer)
 			pool.Put(bc)
 		}
 	})
