@@ -147,8 +147,9 @@ func NewExecutionEngine(ctx context.Context, logger abstractlogger.Logger, engin
 func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Request, writer resolve.SubscriptionResponseWriter, options ...ExecutionOptions) (error, *resolve.TraceInfo) {
 
 	execContext := e.getExecutionCtx()
+	execContext.setContext(ctx)
 	defer e.putExecutionCtx(execContext)
-	execContext.prepare(ctx, operation.Variables, operation.InternalRequest(), options...)
+
 	for i := range options {
 		options[i](execContext)
 	}
@@ -162,11 +163,13 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Reques
 	if !operation.IsNormalized() {
 		result, err := operation.Normalize(e.config.schema)
 		if err != nil {
-			return err, nil
+			SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+			return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 		}
 
 		if !result.Successful {
-			return result.Errors, nil
+			SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+			return result.Errors, resolve.GetTraceInfo(execContext.resolveContext.Context())
 		}
 	}
 	traceTimings.EndNormalize()
@@ -175,21 +178,25 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Reques
 
 	result, err := operation.ValidateForSchema(e.config.schema)
 	if err != nil {
-		return err, nil
+		SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+		return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 	if !result.Valid {
-		return result.Errors, nil
+		SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+		return result.Errors, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
 	traceTimings.EndValidate()
 
+	execContext.prepare(execContext.resolveContext.Context(), operation.Variables, operation.InternalRequest(), options...)
 	var report operationreport.Report
 
 	traceTimings.StartPlanning()
 
 	cachedPlan := e.getCachedPlan(execContext, operation.Document(), e.config.schema.Document(), operation.OperationName, &report)
 	if report.HasErrors() {
-		return report, nil
+		SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+		return report, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
 	traceTimings.EndPlanning()
@@ -202,7 +209,7 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Reques
 	case *plan.SubscriptionResponsePlan:
 		err = e.resolver.ResolveGraphQLSubscription(execContext.resolveContext, p.Response, writer)
 	default:
-		return errors.New("execution of operation is not possible"), nil
+		return errors.New("execution of operation is not possible"), resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 	traceTimings.EndResolve()
 	SetResolverTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
