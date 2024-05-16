@@ -191,6 +191,13 @@ func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLRespons
 		return err
 	}
 
+	var traceNode *TraceNode = nil
+
+	if ctx.TracingOptions.Enable {
+		traceNode = GetTrace(ctx.ctx, response.Data)
+		ctx.Trace = *traceNode
+	}
+
 	return t.resolvable.Resolve(ctx.ctx, response.Data, writer)
 }
 

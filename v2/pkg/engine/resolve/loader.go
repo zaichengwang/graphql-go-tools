@@ -1435,6 +1435,15 @@ func (l *Loader) executeSourceLoad(ctx context.Context, source DataSource, input
 			}
 			trace.DurationLoadPretty = time.Duration(trace.DurationLoadNano).String()
 		}
+
+		// make a copy of the trace field from http response to trace object, since we're going to delete it later
+		directResponseDataCopy := make([]byte, res.out.Len())
+		copy(directResponseDataCopy, res.out.Bytes())
+		traceExtension, _, _, httpTraceFetchErr := jsonparser.Get(directResponseDataCopy, "httpExtensions", "trace")
+		if httpTraceFetchErr == nil {
+			trace.HttpCallData = make([]byte, len(traceExtension))
+			copy(trace.HttpCallData, traceExtension)
+		}
 	}
 	if res.err != nil {
 		if l.ctx.TracingOptions.Enable {

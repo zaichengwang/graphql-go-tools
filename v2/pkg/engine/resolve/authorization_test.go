@@ -160,7 +160,7 @@ func TestAuthorization(t *testing.T) {
 		resolveCtx := &Context{ctx: context.Background(), Variables: nil, authorizer: authorizer}
 
 		return res, resolveCtx,
-			`{"data":{"me":{"id":"1234","username":"Me","reviews":[{"body":"A highly effective form of birth control.","product":{"upc":"top-1","name":"Trilby"}},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits.","product":{"upc":"top-2","name":"Fedora"}}]}},"extensions":{"authorization":{"missingScopes":["id"]}}}`,
+			`{"data":{"me":{"id":"1234","username":"Me","reviews":[{"body":"A highly effective form of birth control.","product":{"upc":"top-1","name":"Trilby"}},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits.","product":{"upc":"top-2","name":"Fedora"}}]}},"traceExtensions":{"authorization":{"missingScopes":["id"]}}}`,
 			func(t *testing.T) {
 				assert.Equal(t, int64(2), authorizer.(*testAuthorizer).preFetchCalls.Load())
 				assert.Equal(t, int64(4), authorizer.(*testAuthorizer).objectFieldCalls.Load())

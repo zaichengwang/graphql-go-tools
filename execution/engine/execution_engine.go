@@ -3,12 +3,10 @@ package engine
 import (
 	"context"
 	"errors"
-	"net/http"
-	"sync"
-	"time"
-
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/jensneuse/abstractlogger"
+	"net/http"
+	"sync"
 
 	"github.com/wundergraph/graphql-go-tools/execution/graphql"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
@@ -136,72 +134,72 @@ func NewExecutionEngine(ctx context.Context, logger abstractlogger.Logger, engin
 	}, nil
 }
 
-func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Request, writer resolve.SubscriptionResponseWriter, options ...ExecutionOptions) error {
-	if !operation.IsNormalized() {
-		result, err := operation.Normalize(e.config.schema)
-		if err != nil {
-			return err
-		}
-
-		if !result.Successful {
-			return result.Errors
-		}
-	}
-
-	result, err := operation.ValidateForSchema(e.config.schema)
-	if err != nil {
-		return err
-	}
-	if !result.Valid {
-		return result.Errors
-	}
+func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Request, writer resolve.SubscriptionResponseWriter, options ...ExecutionOptions) (error, *resolve.TraceInfo) {
 
 	execContext := newInternalExecutionContext()
-
-	execContext.prepare(ctx, operation.Variables, operation.InternalRequest(), options...)
 
 	for i := range options {
 		options[i](execContext)
 	}
 
+	execContext.prepare(ctx, operation.Variables, operation.InternalRequest(), options...)
+
 	if execContext.resolveContext.TracingOptions.Enable {
 		traceCtx := resolve.SetTraceStart(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions.EnablePredictableDebugTimings)
 		execContext.setContext(traceCtx)
 	}
+	traceTimings := NewTraceTimings(execContext.resolveContext.Context())
 
-	var tracePlanStart int64
+	traceTimings.StartNormalize()
+	if !operation.IsNormalized() {
+		result, err := operation.Normalize(e.config.schema)
+		if err != nil {
+			return err, nil
+		}
 
-	if execContext.resolveContext.TracingOptions.Enable && !execContext.resolveContext.TracingOptions.ExcludePlannerStats {
-		tracePlanStart = resolve.GetDurationNanoSinceTraceStart(execContext.resolveContext.Context())
+		if !result.Successful {
+			return result.Errors, nil
+		}
 	}
+	traceTimings.EndNormalize()
+
+	traceTimings.StartValidate()
+
+	result, err := operation.ValidateForSchema(e.config.schema)
+	if err != nil {
+		return err, nil
+	}
+	if !result.Valid {
+		return result.Errors, nil
+	}
+
+	traceTimings.EndValidate()
 
 	var report operationreport.Report
 
+	traceTimings.StartPlanning()
+
 	cachedPlan := e.getCachedPlan(execContext, operation.Document(), e.config.schema.Document(), operation.OperationName, &report)
 	if report.HasErrors() {
-		return report
+		return report, nil
 	}
 
-	if execContext.resolveContext.TracingOptions.Enable && !execContext.resolveContext.TracingOptions.ExcludePlannerStats {
-		planningTime := resolve.GetDurationNanoSinceTraceStart(execContext.resolveContext.Context()) - tracePlanStart
-		resolve.SetPlannerStats(execContext.resolveContext.Context(), resolve.PhaseStats{
-			DurationSinceStartNano:   tracePlanStart,
-			DurationSinceStartPretty: time.Duration(tracePlanStart).String(),
-			DurationNano:             planningTime,
-			DurationPretty:           time.Duration(planningTime).String(),
-		})
-	}
+	traceTimings.EndPlanning()
 
+	traceTimings.StartResolve()
+	SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
 	switch p := cachedPlan.(type) {
 	case *plan.SynchronousResponsePlan:
 		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer)
 	case *plan.SubscriptionResponsePlan:
 		err = e.resolver.ResolveGraphQLSubscription(execContext.resolveContext, p.Response, writer)
 	default:
-		return errors.New("execution of operation is not possible")
+		return errors.New("execution of operation is not possible"), nil
 	}
+	traceTimings.EndResolve()
+	SetResolverTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
 
-	return err
+	return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 }
 
 func (e *ExecutionEngine) getCachedPlan(ctx *internalExecutionContext, operation, definition *ast.Document, operationName string, report *operationreport.Report) plan.Plan {

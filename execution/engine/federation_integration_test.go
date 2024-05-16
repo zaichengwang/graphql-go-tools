@@ -60,7 +60,7 @@ func TestFederationIntegrationTestWithArt(t *testing.T) {
 		respString := string(resp)
 
 		assert.Contains(t, respString, `{"data":{"me":{"id":"1234","username":"Me"}}`)
-		assert.Contains(t, respString, `"extensions":{"trace":{"info":{"trace_start_time"`)
+		assert.Contains(t, respString, `"traceExtensions":{"trace":{"info":{"trace_start_time"`)
 	})
 }
 

@@ -20,6 +20,7 @@ var (
 	literalPath               = []byte("path")
 	literalUnderscoreEntities = []byte("_entities")
 	literalExtensions         = []byte("extensions")
+	literalTraceExtensions    = []byte("traceExtensions")
 	literalTrace              = []byte("trace")
 	literalRateLimit          = []byte("rateLimit")
 	literalAuthorization      = []byte("authorization")

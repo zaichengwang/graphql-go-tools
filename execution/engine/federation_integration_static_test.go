@@ -50,7 +50,7 @@ func TestExecutionEngine_FederationAndSubscription_IntegrationTest(t *testing.T)
 			defer execCtxCancelFn()
 
 			resultWriter := graphql.NewEngineResultWriter()
-			err = engine.Execute(execCtx, gqlRequest, &resultWriter)
+			err, _ = engine.Execute(execCtx, gqlRequest, &resultWriter)
 			if assert.NoError(t, err) {
 				assert.Equal(t,
 					`{"data":{"me":{"reviews":[{"body":"A highly effective form of birth control.","product":{"upc":"top-1","name":"Trilby","price":11}},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits.","product":{"upc":"top-2","name":"Fedora","price":22}}]}}}`,
@@ -96,7 +96,7 @@ subscription UpdatedPrice {
 			})
 
 			go func() {
-				_ = engine.Execute(execCtx, gqlRequest, &resultWriter)
+				_, _ = engine.Execute(execCtx, gqlRequest, &resultWriter)
 			}()
 
 			assert.Eventuallyf(t, func() bool {

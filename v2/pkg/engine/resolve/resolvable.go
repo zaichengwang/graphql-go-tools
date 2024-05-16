@@ -138,10 +138,20 @@ func (r *Resolvable) Resolve(ctx context.Context, root *Object, out io.Writer) e
 		r.printBytes(quote)
 		r.printBytes(colon)
 		r.printBytes(null)
-		if r.hasExtensions() {
-			r.printBytes(comma)
-			r.printErr = r.printExtensions(ctx, root)
+		if r.hasTraceExtensions() {
+			//r.printBytes(comma)
+			//r.printErr = r.printTraceExtensions(ctx, root)
 		}
+
+		if r.hasExtension() {
+			r.printBytes(comma)
+			r.printBytes(quote)
+			r.printBytes(literalExtensions)
+			r.printBytes(quote)
+			r.printBytes(colon)
+			r.printNode(r.extensionsRoot)
+		}
+
 		r.printBytes(rBrace)
 		return nil
 	}
@@ -164,10 +174,20 @@ func (r *Resolvable) Resolve(ctx context.Context, root *Object, out io.Writer) e
 	} else {
 		r.printData(root)
 	}
-	if r.hasExtensions() {
-		r.printBytes(comma)
-		r.printErr = r.printExtensions(ctx, root)
+	if r.hasTraceExtensions() {
+		//r.printBytes(comma)
+		//r.printErr = r.printTraceExtensions(ctx, root)
 	}
+
+	if r.hasExtension() {
+		r.printBytes(comma)
+		r.printBytes(quote)
+		r.printBytes(literalExtensions)
+		r.printBytes(quote)
+		r.printBytes(colon)
+		r.printNode(r.extensionsRoot)
+	}
+
 	r.printBytes(rBrace)
 
 	return r.printErr
@@ -200,9 +220,9 @@ func (r *Resolvable) printData(root *Object) {
 	r.wroteData = true
 }
 
-func (r *Resolvable) printExtensions(ctx context.Context, root *Object) error {
+func (r *Resolvable) printTraceExtensions(ctx context.Context, root *Object) error {
 	r.printBytes(quote)
-	r.printBytes(literalExtensions)
+	r.printBytes(literalTraceExtensions)
 	r.printBytes(quote)
 	r.printBytes(colon)
 	r.printBytes(lBrace)
@@ -239,9 +259,6 @@ func (r *Resolvable) printExtensions(ctx context.Context, root *Object) error {
 			return err
 		}
 	}
-
-	// print extension from data response
-	r.printNode(r.extensionsRoot)
 
 	r.printBytes(rBrace)
 	return nil
@@ -282,7 +299,7 @@ func (r *Resolvable) printTraceExtension(ctx context.Context, root *Object) erro
 	return nil
 }
 
-func (r *Resolvable) hasExtensions() bool {
+func (r *Resolvable) hasTraceExtensions() bool {
 	if r.ctx.authorizer != nil && r.ctx.authorizer.HasResponseExtensionData(r.ctx) {
 		return true
 	}
@@ -292,6 +309,10 @@ func (r *Resolvable) hasExtensions() bool {
 	if r.ctx.TracingOptions.Enable && r.ctx.TracingOptions.IncludeTraceOutputInResponseExtensions {
 		return true
 	}
+	return false
+}
+
+func (r *Resolvable) hasDataExtensions() bool {
 	return r.storage.NodeIsDefined(r.extensionsRoot) &&
 		len(r.storage.Nodes[r.extensionsRoot].ObjectFields) > 0
 }
