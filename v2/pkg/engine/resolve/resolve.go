@@ -171,7 +171,7 @@ func (r *Resolver) putTools(t *tools) {
 	}
 }
 
-func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLResponse, data []byte, writer io.Writer) (err error) {
+func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLResponse, data []byte, writer io.Writer, tracingTiming *TraceTimings) (err error) {
 	if response.Info == nil {
 		response.Info = &GraphQLResponseInfo{
 			OperationType: ast.OperationTypeQuery,
@@ -186,10 +186,14 @@ func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLRespons
 		return err
 	}
 
+	tracingTiming.StartLoadResponse()
 	err = t.loader.LoadGraphQLResponseData(ctx, response, t.resolvable)
 	if err != nil {
+		SetLoadResponseTracingStat(ctx.ctx, ctx.TracingOptions, tracingTiming)
 		return err
 	}
+	tracingTiming.EndLoadResponse()
+	SetLoadResponseTracingStat(ctx.ctx, ctx.TracingOptions, tracingTiming)
 
 	var traceNode *TraceNode = nil
 
@@ -198,7 +202,15 @@ func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLRespons
 		ctx.Trace = *traceNode
 	}
 
-	return t.resolvable.Resolve(ctx.ctx, response.Data, writer)
+	tracingTiming.StartResolve()
+	err = t.resolvable.Resolve(ctx.ctx, response.Data, writer)
+	if err != nil {
+		SetResolveTracingStat(ctx.ctx, ctx.TracingOptions, tracingTiming)
+		return err
+	}
+	tracingTiming.EndResolve()
+	SetResolveTracingStat(ctx.ctx, ctx.TracingOptions, tracingTiming)
+	return err
 }
 
 type trigger struct {

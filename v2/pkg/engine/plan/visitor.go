@@ -176,7 +176,6 @@ func (v *Visitor) AllowVisitor(kind astvisitor.VisitorKind, ref int, visitor any
 }
 
 func (v *Visitor) currentFullPath(skipFragments bool) string {
-	skipFragments = false
 	path := v.Walker.Path.DotDelimitedString()
 	if skipFragments {
 		path = v.Walker.Path.WithoutInlineFragmentNames().DotDelimitedString()

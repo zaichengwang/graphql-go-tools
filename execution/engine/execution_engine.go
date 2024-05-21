@@ -149,18 +149,18 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Reques
 		traceCtx := resolve.SetTraceStart(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions.EnablePredictableDebugTimings)
 		execContext.setContext(traceCtx)
 	}
-	traceTimings := NewTraceTimings(execContext.resolveContext.Context())
+	traceTimings := resolve.NewTraceTimings(execContext.resolveContext.Context())
 
 	traceTimings.StartNormalize()
 	if !operation.IsNormalized() {
 		result, err := operation.Normalize(e.config.schema)
 		if err != nil {
-			SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+			resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
 			return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 		}
 
 		if !result.Successful {
-			SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+			resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
 			return result.Errors, resolve.GetTraceInfo(execContext.resolveContext.Context())
 		}
 	}
@@ -170,11 +170,11 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Reques
 
 	result, err := operation.ValidateForSchema(e.config.schema)
 	if err != nil {
-		SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+		resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
 		return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 	if !result.Valid {
-		SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+		resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
 		return result.Errors, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
@@ -187,24 +187,21 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Reques
 
 	cachedPlan := e.getCachedPlan(execContext, operation.Document(), e.config.schema.Document(), operation.OperationName, &report)
 	if report.HasErrors() {
-		SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+		resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
 		return report, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
 	traceTimings.EndPlanning()
 
-	traceTimings.StartResolve()
-	SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+	resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
 	switch p := cachedPlan.(type) {
 	case *plan.SynchronousResponsePlan:
-		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer)
+		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer, traceTimings)
 	case *plan.SubscriptionResponsePlan:
 		err = e.resolver.ResolveGraphQLSubscription(execContext.resolveContext, p.Response, writer)
 	default:
 		return errors.New("execution of operation is not possible"), resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
-	traceTimings.EndResolve()
-	SetResolverTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
 
 	return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 }

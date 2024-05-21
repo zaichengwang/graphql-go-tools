@@ -164,15 +164,16 @@ func (c *Context) Free() {
 type traceStartKey struct{}
 
 type TraceInfo struct {
-	TraceStart     time.Time  `json:"-"`
-	TraceStartTime string     `json:"trace_start_time"`
-	TraceStartUnix int64      `json:"trace_start_unix"`
-	ParseStats     PhaseStats `json:"parse_stats"`
-	NormalizeStats PhaseStats `json:"normalize_stats"`
-	ValidateStats  PhaseStats `json:"validate_stats"`
-	PlannerStats   PhaseStats `json:"planner_stats"`
-	ResolveStats   PhaseStats `json:"resolve_stats"`
-	debug          bool
+	TraceStart        time.Time  `json:"-"`
+	TraceStartTime    string     `json:"trace_start_time"`
+	TraceStartUnix    int64      `json:"trace_start_unix"`
+	ParseStats        PhaseStats `json:"parse_stats"`
+	NormalizeStats    PhaseStats `json:"normalize_stats"`
+	ValidateStats     PhaseStats `json:"validate_stats"`
+	PlannerStats      PhaseStats `json:"planner_stats"`
+	LoadResponseStats PhaseStats `json:"load_response_stats"`
+	ResolveStats      PhaseStats `json:"resolve_stats"`
+	debug             bool
 }
 
 type PhaseStats struct {
@@ -255,6 +256,14 @@ func SetPlannerStats(ctx context.Context, stats PhaseStats) {
 		return
 	}
 	info.PlannerStats = SetDebugStats(info, stats, 4)
+}
+
+func SetLoadResponseStats(ctx context.Context, stats PhaseStats) {
+	info := GetTraceInfo(ctx)
+	if info == nil {
+		return
+	}
+	info.LoadResponseStats = SetDebugStats(info, stats, 5)
 }
 
 func SetResolveStats(ctx context.Context, stats PhaseStats) {

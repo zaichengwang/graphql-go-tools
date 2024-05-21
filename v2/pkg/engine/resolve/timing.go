@@ -1,10 +1,8 @@
-package engine
+package resolve
 
 import (
 	"context"
 	"time"
-
-	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/resolve"
 )
 
 type TraceTimings struct {
@@ -18,8 +16,10 @@ type TraceTimings struct {
 	PlanningStart  int64
 	PlanningEnd    int64
 
-	ResolveStart int64
-	ResolveEnd   int64
+	LoadResponseStart int64
+	LoadResponseEnd   int64
+	ResolveStart      int64
+	ResolveEnd        int64
 }
 
 func NewTraceTimings(ctx context.Context) *TraceTimings {
@@ -29,44 +29,52 @@ func NewTraceTimings(ctx context.Context) *TraceTimings {
 }
 
 func (tt *TraceTimings) StartResolve() {
-	tt.ResolveStart = resolve.GetDurationNanoSinceTraceStart(tt.ctx)
+	tt.ResolveStart = GetDurationNanoSinceTraceStart(tt.ctx)
 }
 
 func (tt *TraceTimings) EndResolve() {
-	tt.ResolveEnd = resolve.GetDurationNanoSinceTraceStart(tt.ctx)
+	tt.ResolveEnd = GetDurationNanoSinceTraceStart(tt.ctx)
+}
+
+func (tt *TraceTimings) StartLoadResponse() {
+	tt.LoadResponseStart = GetDurationNanoSinceTraceStart(tt.ctx)
+}
+
+func (tt *TraceTimings) EndLoadResponse() {
+	tt.LoadResponseEnd = GetDurationNanoSinceTraceStart(tt.ctx)
 }
 
 func (tt *TraceTimings) StartParse() {
-	tt.ParseStart = resolve.GetDurationNanoSinceTraceStart(tt.ctx)
+	tt.ParseStart = GetDurationNanoSinceTraceStart(tt.ctx)
 }
 
 func (tt *TraceTimings) EndParse() {
-	tt.ParseEnd = resolve.GetDurationNanoSinceTraceStart(tt.ctx)
+	tt.ParseEnd = GetDurationNanoSinceTraceStart(tt.ctx)
 }
 
 // StartNormalize starts the timing for the normalization step
 func (tt *TraceTimings) StartNormalize() {
-	tt.NormalizeStart = resolve.GetDurationNanoSinceTraceStart(tt.ctx)
+	tt.NormalizeStart = GetDurationNanoSinceTraceStart(tt.ctx)
 }
 
 func (tt *TraceTimings) EndNormalize() {
-	tt.NormalizeEnd = resolve.GetDurationNanoSinceTraceStart(tt.ctx)
+	tt.NormalizeEnd = GetDurationNanoSinceTraceStart(tt.ctx)
 }
 
 func (tt *TraceTimings) StartValidate() {
-	tt.ValidateStart = resolve.GetDurationNanoSinceTraceStart(tt.ctx)
+	tt.ValidateStart = GetDurationNanoSinceTraceStart(tt.ctx)
 }
 
 func (tt *TraceTimings) EndValidate() {
-	tt.ValidateEnd = resolve.GetDurationNanoSinceTraceStart(tt.ctx)
+	tt.ValidateEnd = GetDurationNanoSinceTraceStart(tt.ctx)
 }
 
 func (tt *TraceTimings) StartPlanning() {
-	tt.PlanningStart = resolve.GetDurationNanoSinceTraceStart(tt.ctx)
+	tt.PlanningStart = GetDurationNanoSinceTraceStart(tt.ctx)
 }
 
 func (tt *TraceTimings) EndPlanning() {
-	tt.PlanningEnd = resolve.GetDurationNanoSinceTraceStart(tt.ctx)
+	tt.PlanningEnd = GetDurationNanoSinceTraceStart(tt.ctx)
 }
 
 func (tt *TraceTimings) DurationParse() int64 {
@@ -85,9 +93,9 @@ func (tt *TraceTimings) DurationPlanning() int64 {
 	return tt.PlanningEnd - tt.PlanningStart
 }
 
-func SetRequestTracingStats(ctx context.Context, traceOptions resolve.TraceOptions, traceTimings *TraceTimings) {
+func SetRequestTracingStats(ctx context.Context, traceOptions TraceOptions, traceTimings *TraceTimings) {
 	if !traceOptions.ExcludeParseStats {
-		resolve.SetParseStats(ctx, resolve.PhaseStats{
+		SetParseStats(ctx, PhaseStats{
 			DurationSinceStartNano:   traceTimings.ParseStart,
 			DurationSinceStartPretty: time.Duration(traceTimings.ParseStart).String(),
 			DurationNano:             traceTimings.DurationParse(),
@@ -95,7 +103,7 @@ func SetRequestTracingStats(ctx context.Context, traceOptions resolve.TraceOptio
 		})
 	}
 	if !traceOptions.ExcludeNormalizeStats {
-		resolve.SetNormalizeStats(ctx, resolve.PhaseStats{
+		SetNormalizeStats(ctx, PhaseStats{
 			DurationSinceStartNano:   traceTimings.NormalizeStart,
 			DurationSinceStartPretty: time.Duration(traceTimings.NormalizeStart).String(),
 			DurationNano:             traceTimings.DurationNormalize(),
@@ -103,7 +111,7 @@ func SetRequestTracingStats(ctx context.Context, traceOptions resolve.TraceOptio
 		})
 	}
 	if !traceOptions.ExcludeValidateStats {
-		resolve.SetValidateStats(ctx, resolve.PhaseStats{
+		SetValidateStats(ctx, PhaseStats{
 			DurationSinceStartNano:   traceTimings.ValidateStart,
 			DurationSinceStartPretty: time.Duration(traceTimings.ValidateStart).String(),
 			DurationNano:             traceTimings.DurationValidate(),
@@ -111,7 +119,7 @@ func SetRequestTracingStats(ctx context.Context, traceOptions resolve.TraceOptio
 		})
 	}
 	if !traceOptions.ExcludePlannerStats {
-		resolve.SetPlannerStats(ctx, resolve.PhaseStats{
+		SetPlannerStats(ctx, PhaseStats{
 			DurationSinceStartNano:   traceTimings.PlanningStart,
 			DurationSinceStartPretty: time.Duration(traceTimings.PlanningStart).String(),
 			DurationNano:             traceTimings.DurationPlanning(),
@@ -120,11 +128,21 @@ func SetRequestTracingStats(ctx context.Context, traceOptions resolve.TraceOptio
 	}
 }
 
-func SetResolverTracingStat(ctx context.Context, traceOptions resolve.TraceOptions, traceTimings *TraceTimings) {
-	resolve.SetResolveStats(ctx, resolve.PhaseStats{
+func SetResolveTracingStat(ctx context.Context, traceOptions TraceOptions, traceTimings *TraceTimings) {
+	SetResolveStats(ctx, PhaseStats{
 		DurationSinceStartNano:   traceTimings.ResolveStart,
 		DurationSinceStartPretty: time.Duration(traceTimings.ResolveStart).String(),
 		DurationNano:             traceTimings.ResolveEnd - traceTimings.ResolveStart,
 		DurationPretty:           time.Duration(traceTimings.ResolveEnd - traceTimings.ResolveStart).String(),
 	})
+}
+
+func SetLoadResponseTracingStat(ctx context.Context, traceOptions TraceOptions, traceTimings *TraceTimings) {
+	SetLoadResponseStats(ctx, PhaseStats{
+		DurationSinceStartNano:   traceTimings.LoadResponseStart,
+		DurationSinceStartPretty: time.Duration(traceTimings.LoadResponseStart).String(),
+		DurationNano:             traceTimings.LoadResponseEnd - traceTimings.LoadResponseStart,
+		DurationPretty:           time.Duration(traceTimings.LoadResponseEnd - traceTimings.LoadResponseStart).String(),
+	})
+
 }
