@@ -176,6 +176,7 @@ func (v *Visitor) AllowVisitor(kind astvisitor.VisitorKind, ref int, visitor any
 }
 
 func (v *Visitor) currentFullPath(skipFragments bool) string {
+	skipFragments = false
 	path := v.Walker.Path.DotDelimitedString()
 	if skipFragments {
 		path = v.Walker.Path.WithoutInlineFragmentNames().DotDelimitedString()
@@ -272,7 +273,7 @@ func (v *Visitor) EnterField(ref int) {
 	}
 	fieldDefinitionTypeRef := v.Definition.FieldDefinitionType(fieldDefinition)
 
-	fullFieldPathWithoutFragments := v.currentFullPath(true)
+	fullFieldPathWithoutFragments := v.currentFullPath(false)
 
 	// if we already have a field with the same path we merge existing field with the current one
 	if v.allowFieldMerge && v.handleExistingField(ref, fieldDefinitionTypeRef, fullFieldPathWithoutFragments) {

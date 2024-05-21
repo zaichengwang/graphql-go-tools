@@ -6481,6 +6481,166 @@ func TestGraphQLDataSourceFederation(t *testing.T) {
 	})
 
 	t.Run("fragments on a root query type", func(t *testing.T) {
+
+		t.Run("my case", func(t *testing.T) {
+			def := `
+			schema {
+				query: Query
+			}
+		
+			type Query {
+				brandMenuTemplateById(input: BrandMenuTemplateByIdInput!): BrandMenuTemplateQueryResult!
+			}
+
+			input BrandMenuTemplateByIdInput {
+ 				 id: Int!
+			}			
+			
+			union BrandMenuTemplateQueryResult = BrandMenuTemplate | AuthorizationError
+
+			type BrandMenuTemplate {
+				entities: [BrandMenuTemplateEntity!]!
+			}
+			union BrandMenuTemplateEntity = MenuTemplateItem | MenuTemplateModifierGroup
+
+			type AuthorizationError {
+  				message: String
+  				traceId: String!
+			}
+
+type MenuTemplateItem {
+	id: Int!
+	storeConfigurationSummary(
+    input: StoreConfigurationSummaryInput! = { storeIds: null }
+  ): CustomerItemStoreConfigurationSummary!
+}
+
+type CustomerItemStoreConfigurationSummary {
+	numberOfStores: Int!
+    fulfillmentBrands: [RestrictedBrandQueryResult!]!
+}
+
+input StoreConfigurationSummaryInput {
+	storeIds: [Int!]
+}
+
+type RestrictedBrandQueryResult {
+	name: String!
+}
+
+type MenuTemplateModifierGroup {
+    id: Int!
+	storeConfigurationSummary(
+    input: StoreConfigurationSummaryInput! = { storeIds: null }
+  ): CustomerModifierGroupStoreConfigurationSummary!
+}
+
+type CustomerModifierGroupStoreConfigurationSummary {
+   	numberOfStores: Int!
+}
+			`
+			op := `
+
+query GetTemplateMenuSummary($templateId: Int!, $input: StoreConfigurationSummaryInput!) {
+  brandMenuTemplateById(input: {id: $templateId}) {
+    __typename
+    ... on BrandMenuTemplate {
+      entities {
+        ... on MenuTemplateItem {
+          __typename
+          id
+          storeConfigurationSummary(input: $input) {
+            numberOfStores
+            fulfillmentBrands {
+                name
+            }
+          }
+        }
+        ... on MenuTemplateModifierGroup {
+          __typename
+          id
+          storeConfigurationSummary(input: $input) {
+            numberOfStores
+          }
+        }
+      }
+    }
+  }
+}
+
+`
+			t.Run("same datasource complecx", func(t *testing.T) {
+				t.Run("run", RunTest(
+					def, op,
+					"GetTemplateMenuSummary", &plan.SynchronousResponsePlan{
+						Response: &resolve.GraphQLResponse{
+							Data: &resolve.Object{
+								Fetch: &resolve.SingleFetch{
+									FetchConfiguration: resolve.FetchConfiguration{
+										DataSource:     &Source{},
+										PostProcessing: DefaultPostProcessingConfiguration,
+										Input:          `{"method":"POST","url":"https://example.com/graphql","body":{"query":"query($skipA: Boolean!, $includeB: Boolean!){__typename ... on Query @skip(if: $skipA) {a} ... on Query @include(if: $includeB){b}}","variables":{"includeB":$$1$$,"skipA":$$0$$}}}`,
+										Variables: resolve.NewVariables(
+											&resolve.ContextVariable{
+												Path:     []string{"skipA"},
+												Renderer: resolve.NewJSONVariableRendererWithValidation(`{"type":["boolean"]}`),
+											},
+											&resolve.ContextVariable{
+												Path:     []string{"includeB"},
+												Renderer: resolve.NewJSONVariableRendererWithValidation(`{"type":["boolean"]}`),
+											},
+										),
+									},
+									DataSourceIdentifier: []byte("graphql_datasource.Source"),
+								},
+								Fields: []*resolve.Field{
+									{
+										Name: []byte("a"),
+										Value: &resolve.String{
+											Path: []string{"a"},
+										},
+										SkipDirectiveDefined: true,
+										SkipVariableName:     "skipA",
+										OnTypeNames:          [][]byte{[]byte("Query")},
+									},
+									{
+										Name: []byte("b"),
+										Value: &resolve.String{
+											Path: []string{"b"},
+										},
+										IncludeDirectiveDefined: true,
+										IncludeVariableName:     "includeB",
+										OnTypeNames:             [][]byte{[]byte("Query")},
+									},
+								},
+							},
+						},
+					}, plan.Configuration{
+						DataSources: []plan.DataSource{
+							mustDataSourceConfiguration(
+								t,
+								"ds-id",
+								&plan.DataSourceMetadata{
+									RootNodes: []plan.TypeField{
+										{
+											TypeName:   "Query",
+											FieldNames: []string{"a", "b"},
+										},
+									},
+								},
+								mustCustomConfiguration(t, ConfigurationInput{
+									Fetch: &FetchConfiguration{
+										URL: "https://example.com/graphql",
+									},
+									SchemaConfiguration: mustSchema(t, nil, def),
+								}),
+							),
+						},
+						DisableResolveFieldPositions: true,
+					}))
+			})
+		})
+
 		t.Run("simple", func(t *testing.T) {
 			def := `
 			schema {
