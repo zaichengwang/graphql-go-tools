@@ -23,6 +23,15 @@ type NodeSuggestion struct {
 	SelectionReasons          []string
 
 	fieldRef int
+
+	// Those are configs related to roll out feature
+	isPrimaryDataSource bool
+	// rolloutPercentage is the percentage of traffic that should be routed to this data source
+	rolloutPercentage int
+	// indicate if rollout is enabled
+	isRolloutEnabled bool
+
+	DataSourceID string
 }
 
 func (n *NodeSuggestion) treeNodeID() uint {

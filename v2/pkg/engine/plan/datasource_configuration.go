@@ -13,6 +13,13 @@ import (
 
 type DSHash uint64
 
+type NodeRolloutConfig struct {
+	NodeType          string
+	NodeName          string
+	RolloutPercentage int
+	IsRolloutEnabled  bool
+}
+
 // PlannerFactory is the factory for the creation of the concrete DataSourcePlanner
 // For stateful datasources, the factory should contain execution context
 // Once the context gets cancelled, all stateful DataSources must close their connections and cleanup themselves.
@@ -95,6 +102,15 @@ type dataSourceConfiguration[T any] struct {
 	Custom              T                 // Custom is the datasource specific configuration
 
 	hash DSHash // hash is a unique hash for the dataSourceConfiguration used to match datasources
+
+	// The below configurations are used to setup the grey rollout
+	// used for ottergate data source
+	isPrimaryDataSource bool
+	// indicate if rollout is enabled
+	isRolloutEnabled bool
+	// the default rollout percentage
+	rolloutPercentage  int
+	nodeRolloutConfigs []NodeRolloutConfig
 }
 
 func NewDataSourceConfiguration[T any](id string, factory PlannerFactory[T], metadata *DataSourceMetadata, customConfig T) (DataSourceConfiguration[T], error) {
@@ -103,11 +119,34 @@ func NewDataSourceConfiguration[T any](id string, factory PlannerFactory[T], met
 	}
 
 	return &dataSourceConfiguration[T]{
-		ID:                 id,
-		Factory:            factory,
-		DataSourceMetadata: metadata,
-		Custom:             customConfig,
-		hash:               DSHash(xxhash.Sum64([]byte(id))),
+		ID:                  id,
+		Factory:             factory,
+		DataSourceMetadata:  metadata,
+		Custom:              customConfig,
+		hash:                DSHash(xxhash.Sum64([]byte(id))),
+		isPrimaryDataSource: false,
+		isRolloutEnabled:    false,
+		rolloutPercentage:   0,
+		nodeRolloutConfigs:  []NodeRolloutConfig{},
+	}, nil
+}
+
+func NewDataSourceConfigurationWithRolloutConfig[T any](id string, factory PlannerFactory[T], metadata *DataSourceMetadata, customConfig T,
+	isPrimaryDataSource bool, rolloutPercentage int, isRolloutEnabled bool, nodeRolloutConfigs []NodeRolloutConfig) (DataSourceConfiguration[T], error) {
+	if id == "" {
+		return nil, errors.New("data source id could not be empty")
+	}
+
+	return &dataSourceConfiguration[T]{
+		ID:                  id,
+		Factory:             factory,
+		DataSourceMetadata:  metadata,
+		Custom:              customConfig,
+		hash:                DSHash(xxhash.Sum64([]byte(id))),
+		isPrimaryDataSource: isPrimaryDataSource,
+		isRolloutEnabled:    isRolloutEnabled,
+		rolloutPercentage:   rolloutPercentage,
+		nodeRolloutConfigs:  nodeRolloutConfigs,
 	}, nil
 }
 
@@ -124,6 +163,14 @@ type DataSource interface {
 	Hash() DSHash
 	FederationConfiguration() FederationMetaData
 	CreatePlannerConfiguration(logger abstractlogger.Logger, fetchConfig *objectFetchConfiguration, pathConfig *plannerPathsConfiguration) PlannerConfiguration
+
+	IsPrimaryDataSource() bool
+	// indicate if rollout is enabled
+	IsRolloutEnabled() bool
+
+	RolloutPercentage() int
+
+	NodeRolloutConfigs() []NodeRolloutConfig
 }
 
 func (d *dataSourceConfiguration[T]) CustomConfiguration() T {
@@ -156,6 +203,22 @@ func (d *dataSourceConfiguration[T]) FederationConfiguration() FederationMetaDat
 
 func (d *dataSourceConfiguration[T]) Hash() DSHash {
 	return d.hash
+}
+
+func (d *dataSourceConfiguration[T]) IsPrimaryDataSource() bool {
+	return d.isPrimaryDataSource
+}
+
+func (d *dataSourceConfiguration[T]) IsRolloutEnabled() bool {
+	return d.isRolloutEnabled
+}
+
+func (d *dataSourceConfiguration[T]) RolloutPercentage() int {
+	return d.rolloutPercentage
+}
+
+func (d *dataSourceConfiguration[T]) NodeRolloutConfigs() []NodeRolloutConfig {
+	return d.nodeRolloutConfigs
 }
 
 type DataSourcePlannerConfiguration struct {

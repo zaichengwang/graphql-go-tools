@@ -4,6 +4,7 @@ import (
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astvisitor"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
+	"math/rand"
 )
 
 const typeNameField = "__typename"
@@ -60,7 +61,44 @@ func (f *DataSourceFilter) findBestDataSourceSet(dataSources []DataSource, exist
 	f.applySuggestionHints(hints)
 	// f.nodes.printNodes("nodes after applying hints")
 
-	f.selectUniqueNodes()
+	hasDuplicates := f.selectUniqueNodes()
+
+	if hasDuplicates {
+		// assign datasource config to the nodes
+		// make datasource config to hash->config map
+		dsConfigMap := map[DSHash]DataSource{}
+		for _, dsConfig := range dataSources {
+			if dsConfig.IsRolloutEnabled() {
+				dsConfigMap[dsConfig.Hash()] = dsConfig
+			}
+		}
+		for i := range f.nodes.items {
+			dsHash := f.nodes.items[i].DataSourceHash
+			if _, ok := dsConfigMap[dsHash]; !ok {
+				continue
+			}
+			// now we only support Query and Mutation root nodes
+			if f.nodes.items[i].TypeName != "Query" && f.nodes.items[i].TypeName != "Mutation" {
+				continue
+			}
+			f.nodes.items[i].isPrimaryDataSource = dsConfigMap[dsHash].IsPrimaryDataSource()
+			f.nodes.items[i].rolloutPercentage = dsConfigMap[dsHash].RolloutPercentage()
+			f.nodes.items[i].isRolloutEnabled = dsConfigMap[dsHash].IsRolloutEnabled()
+			f.nodes.items[i].DataSourceID = dsConfigMap[dsHash].Id()
+			// override by the node specific rollout configuration
+			for _, nodeRolloutConfig := range dsConfigMap[dsHash].NodeRolloutConfigs() {
+				if nodeRolloutConfig.NodeName == f.nodes.items[i].FieldName && nodeRolloutConfig.NodeType == f.nodes.items[i].TypeName {
+					f.nodes.items[i].rolloutPercentage = nodeRolloutConfig.RolloutPercentage
+					f.nodes.items[i].isRolloutEnabled = nodeRolloutConfig.IsRolloutEnabled
+					break
+				}
+			}
+		}
+		// select root node based on the rollout configuration
+		f.selectFromDuplicateRootNodes()
+
+	}
+
 	// f.nodes.printNodes("unique nodes")
 	f.selectDuplicateNodes(false)
 	// f.nodes.printNodes("duplicate nodes")
@@ -121,6 +159,8 @@ const (
 
 	ReasonStage3SelectAvailableNode = "stage3: select first available node"
 
+	ReasonStage3SelectBasedOnRolloutConfig = "stage3: select based on rollout config"
+
 	ReasonKeyRequirementProvidedByPlanner = "provided by planner as required by @key"
 )
 
@@ -152,11 +192,81 @@ func (f *DataSourceFilter) applySuggestionHints(hints []NodeSuggestionHint) {
 	}
 }
 
+func (f *DataSourceFilter) selectFromDuplicateRootNodes() bool {
+
+	for i := range f.nodes.items {
+		if !f.nodes.items[i].IsRootNode {
+			continue
+		}
+		if f.nodes.items[i].TypeName != "Query" && f.nodes.items[i].TypeName != "Mutation" {
+			continue
+		}
+		if f.nodes.items[i].Selected {
+			continue
+		}
+
+		nodeDuplicates := f.nodes.duplicatesOf(i)
+		nodeDuplicates = append(nodeDuplicates, i)
+		if len(nodeDuplicates) != 2 {
+			continue
+		}
+
+		// Initialize rollout variables
+		rolloutEnabled := false
+		rolloutPercentageTotal := 0
+		primaryNodeIndex := -1
+		// Check if rollout is enabled and calculate total rollout percentage
+		for _, nodeIndex := range nodeDuplicates {
+			currentNode := f.nodes.items[nodeIndex]
+			if currentNode.isRolloutEnabled && (currentNode.rolloutPercentage > 0 || currentNode.isPrimaryDataSource) {
+				rolloutEnabled = true
+				rolloutPercentageTotal += currentNode.rolloutPercentage
+				if currentNode.isPrimaryDataSource {
+					primaryNodeIndex = nodeIndex
+				}
+			}
+		}
+		if rolloutEnabled {
+			if primaryNodeIndex != -1 {
+				// Assign the remaining rollout percentage to the primary node
+				f.nodes.items[primaryNodeIndex].rolloutPercentage = 100 - rolloutPercentageTotal
+			} else {
+				//queryExecutionReport.QueryPlanningError = errors.New("primary node not found " + fmt.Sprintf("%v", nodes[i].Path))
+				continue
+			}
+
+			// Select a node based on rollout percentage
+			randomNumber := rand.Intn(101)
+			selectedNodeIndex := primaryNodeIndex
+			if randomNumber > f.nodes.items[primaryNodeIndex].rolloutPercentage {
+				// Select the non-primary node
+				for _, nodeIndex := range nodeDuplicates {
+					if nodeIndex != primaryNodeIndex {
+						selectedNodeIndex = nodeIndex
+						break
+					}
+				}
+			}
+
+			// Apply the selection
+			f.nodes.items[selectedNodeIndex].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig, f.enableSelectionReasons)
+			// we expect only has 1 root node
+			return true
+			//queryExecutionReport.PlanDecisionMap[nodes[selectedNodeIndex].Path] = nodes[selectedNodeIndex].DataSourceID
+		}
+
+	}
+
+	return true
+}
+
 // selectUniqueNodes - selects nodes (e.g. fields) which are unique to a single datasource
 // In addition we select:
 //   - parent of such node if the node is a leaf and not nested under the fragment
 //   - siblings nodes
-func (f *DataSourceFilter) selectUniqueNodes() {
+func (f *DataSourceFilter) selectUniqueNodes() bool {
+
+	hasDuplicate := false
 
 	for i := range f.nodes.items {
 		if f.nodes.items[i].Selected {
@@ -164,7 +274,8 @@ func (f *DataSourceFilter) selectUniqueNodes() {
 		}
 
 		isNodeUnique := f.nodes.isNodeUnique(i)
-		if !isNodeUnique && i != 0 {
+		if !isNodeUnique {
+			hasDuplicate = true
 			continue
 		}
 
@@ -192,6 +303,7 @@ func (f *DataSourceFilter) selectUniqueNodes() {
 			}
 		}
 	}
+	return hasDuplicate
 }
 
 func (f *DataSourceFilter) selectUniqNodeParentsUpToRootNode(i int) {
@@ -273,6 +385,9 @@ func (f *DataSourceFilter) selectDuplicateNodes(secondRun bool) {
 			if f.nodes.items[i].LessPreferable {
 				continue
 			}
+
+		} else {
+			// Default selection when rollout is not enabled or there are not exactly two nodes
 			f.nodes.items[i].selectWithReason(ReasonStage3SelectAvailableNode, f.enableSelectionReasons)
 		}
 	}
