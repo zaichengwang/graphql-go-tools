@@ -164,7 +164,7 @@ func (f *DataSourceFilter) selectUniqueNodes() {
 		}
 
 		isNodeUnique := f.nodes.isNodeUnique(i)
-		if !isNodeUnique {
+		if !isNodeUnique && i != 0 {
 			continue
 		}
 
