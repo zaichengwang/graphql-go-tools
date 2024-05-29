@@ -118,14 +118,15 @@ func SetRequestTracingStats(ctx context.Context, traceOptions TraceOptions, trac
 			DurationPretty:           time.Duration(traceTimings.DurationValidate()).String(),
 		})
 	}
-	if !traceOptions.ExcludePlannerStats {
-		SetPlannerStats(ctx, PhaseStats{
-			DurationSinceStartNano:   traceTimings.PlanningStart,
-			DurationSinceStartPretty: time.Duration(traceTimings.PlanningStart).String(),
-			DurationNano:             traceTimings.DurationPlanning(),
-			DurationPretty:           time.Duration(traceTimings.DurationPlanning()).String(),
-		})
-	}
+}
+
+func SetPlanningTracingStat(ctx context.Context, traceOptions TraceOptions, traceTimings *TraceTimings, pathStats PlanningPathStats) {
+	SetPlannerStats(ctx, PhaseStats{
+		DurationSinceStartNano:   traceTimings.PlanningStart,
+		DurationSinceStartPretty: time.Duration(traceTimings.PlanningStart).String(),
+		DurationNano:             traceTimings.DurationPlanning(),
+		DurationPretty:           time.Duration(traceTimings.DurationPlanning()).String(),
+	}, pathStats)
 }
 
 func SetResolveTracingStat(ctx context.Context, traceOptions TraceOptions, traceTimings *TraceTimings) {

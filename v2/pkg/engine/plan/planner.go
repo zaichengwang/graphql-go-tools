@@ -163,6 +163,13 @@ func (p *Planner) Plan(operation, definition *ast.Document, operationName string
 		return
 	}
 
+	// append node suggestions to the plan
+	nodeSuggestions := []NodeSuggestion{}
+	for _, nodeSuggestion := range p.configurationVisitor.nodeSuggestions.items {
+		nodeSuggestions = append(nodeSuggestions, *nodeSuggestion)
+	}
+	p.planningVisitor.plan.SetNodeSuggestions(nodeSuggestions)
+
 	return p.planningVisitor.plan
 }
 

@@ -568,7 +568,7 @@ func TestResolvable_WithTracing(t *testing.T) {
 	SetParseStats(ctx.ctx, PhaseStats{})
 	SetNormalizeStats(ctx.ctx, PhaseStats{})
 	SetValidateStats(ctx.ctx, PhaseStats{})
-	SetPlannerStats(ctx.ctx, PhaseStats{})
+	SetPlannerStats(ctx.ctx, PhaseStats{}, PlanningPathStats{})
 
 	out := &bytes.Buffer{}
 	err = res.Resolve(ctx.ctx, object, out)
