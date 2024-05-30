@@ -79,6 +79,14 @@ type Planner[T Configuration] struct {
 
 	// tmp
 	upstreamSchema *ast.Document
+
+	// The below configurations are used to setup the grey rollout
+	// used for ottergate data source
+	IsPrimaryDataSource bool
+	// rolloutPercentage is the percentage of traffic that should be routed to this data source
+	RolloutPercentage int
+	// indicate if rollout is enabled
+	IsRolloutEnabled bool
 }
 
 type onTypeInlineFragment struct {

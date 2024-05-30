@@ -164,15 +164,16 @@ func (c *Context) Free() {
 type traceStartKey struct{}
 
 type TraceInfo struct {
-	TraceStart        time.Time  `json:"-"`
-	TraceStartTime    string     `json:"trace_start_time"`
-	TraceStartUnix    int64      `json:"trace_start_unix"`
-	ParseStats        PhaseStats `json:"parse_stats"`
-	NormalizeStats    PhaseStats `json:"normalize_stats"`
-	ValidateStats     PhaseStats `json:"validate_stats"`
-	PlannerStats      PhaseStats `json:"planner_stats"`
-	LoadResponseStats PhaseStats `json:"load_response_stats"`
-	ResolveStats      PhaseStats `json:"resolve_stats"`
+	TraceStart        time.Time         `json:"-"`
+	TraceStartTime    string            `json:"trace_start_time"`
+	TraceStartUnix    int64             `json:"trace_start_unix"`
+	ParseStats        PhaseStats        `json:"parse_stats"`
+	NormalizeStats    PhaseStats        `json:"normalize_stats"`
+	ValidateStats     PhaseStats        `json:"validate_stats"`
+	PlannerStats      PhaseStats        `json:"planner_stats"`
+	LoadResponseStats PhaseStats        `json:"load_response_stats"`
+	ResolveStats      PhaseStats        `json:"resolve_stats"`
+	PlanningPathStats PlanningPathStats `json:"planning_path_stats"`
 	debug             bool
 }
 
@@ -181,6 +182,10 @@ type PhaseStats struct {
 	DurationPretty           string `json:"duration_pretty"`
 	DurationSinceStartNano   int64  `json:"duration_since_start_nanoseconds"`
 	DurationSinceStartPretty string `json:"duration_since_start_pretty"`
+}
+
+type PlanningPathStats struct {
+	PlanningPath map[string]string
 }
 
 func SetTraceStart(ctx context.Context, predictableDebugTimings bool) context.Context {
@@ -250,12 +255,13 @@ func SetValidateStats(ctx context.Context, stats PhaseStats) {
 	info.ValidateStats = SetDebugStats(info, stats, 3)
 }
 
-func SetPlannerStats(ctx context.Context, stats PhaseStats) {
+func SetPlannerStats(ctx context.Context, stats PhaseStats, pathStats PlanningPathStats) {
 	info := GetTraceInfo(ctx)
 	if info == nil {
 		return
 	}
 	info.PlannerStats = SetDebugStats(info, stats, 4)
+	info.PlanningPathStats = pathStats
 }
 
 func SetLoadResponseStats(ctx context.Context, stats PhaseStats) {

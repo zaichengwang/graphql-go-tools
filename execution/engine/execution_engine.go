@@ -187,13 +187,13 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Reques
 
 	cachedPlan := e.getCachedPlan(execContext, operation.Document(), e.config.schema.Document(), operation.OperationName, &report)
 	if report.HasErrors() {
-		resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+		resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan.NodeSuggestions()))
 		return report, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
 	traceTimings.EndPlanning()
 
-	resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+	resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan.NodeSuggestions()))
 	switch p := cachedPlan.(type) {
 	case *plan.SynchronousResponsePlan:
 		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer, traceTimings)
@@ -239,4 +239,16 @@ func (e *ExecutionEngine) getCachedPlan(ctx *internalExecutionContext, operation
 
 func (e *ExecutionEngine) GetWebsocketBeforeStartHook() WebsocketBeforeStartHook {
 	return e.config.websocketBeforeStartHook
+}
+
+func suggestionsToPlanningStats(suggestions []plan.NodeSuggestion) resolve.PlanningPathStats {
+	planningPath := make(map[string]string)
+	for _, suggestion := range suggestions {
+		if suggestion.Selected && suggestion.IsRootNode && (suggestion.TypeName == "Query" || suggestion.TypeName == "Mutation") {
+			planningPath[suggestion.Path] = suggestion.DataSourceID
+		}
+	}
+	return resolve.PlanningPathStats{
+		PlanningPath: planningPath,
+	}
 }

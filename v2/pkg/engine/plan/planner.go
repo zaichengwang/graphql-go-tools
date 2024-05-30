@@ -163,11 +163,19 @@ func (p *Planner) Plan(operation, definition *ast.Document, operationName string
 		return
 	}
 
+	// append node suggestions to the plan
+	nodeSuggestions := []NodeSuggestion{}
+	for _, nodeSuggestion := range p.configurationVisitor.nodeSuggestions.items {
+		nodeSuggestions = append(nodeSuggestions, *nodeSuggestion)
+	}
+	p.planningVisitor.plan.SetNodeSuggestions(nodeSuggestions)
+
 	return p.planningVisitor.plan
 }
 
 func (p *Planner) findPlanningPaths(operation, definition *ast.Document, report *operationreport.Report) {
 	dsFilter := NewDataSourceFilter(operation, definition, report)
+	dsFilter.EnableSelectionReasons()
 
 	if p.config.Debug.PrintOperationTransformations {
 		p.debugMessage("Initial operation:")

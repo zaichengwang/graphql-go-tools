@@ -28,6 +28,15 @@ type SubgraphConfiguration struct {
 	SubscriptionProtocol SubscriptionProtocol
 }
 
+type SubgraphRolloutConfig struct {
+	Id                  string
+	Name                string
+	IsPrimaryDataSource bool
+	IsRolloutEnabled    bool
+	RolloutPercentage   int
+	NodeRolloutConfigs  []plan.NodeRolloutConfig
+}
+
 type SubscriptionProtocol string
 
 const (
@@ -135,14 +144,14 @@ func (f *FederationEngineConfigFactory) ComposeRouterConfigString() (string, err
 }
 
 func (f *FederationEngineConfigFactory) BuildEngineConfigurationWithHeader(routerConfigString string,
-	header http.Header) (conf Configuration, err error) {
+	header http.Header, rolloutConfigs []SubgraphRolloutConfig) (conf Configuration, err error) {
 
 	var intermediateConfig nodev1.RouterConfig
 	if err := protojson.Unmarshal([]byte(routerConfigString), &intermediateConfig); err != nil {
 		return Configuration{}, err
 	}
 
-	plannerConfiguration, err := f.createPlannerConfigurationWithHeaders(&intermediateConfig, header)
+	plannerConfiguration, err := f.createPlannerConfigurationWithHeaders(&intermediateConfig, header, rolloutConfigs)
 	if err != nil {
 		return Configuration{}, err
 	}
@@ -182,7 +191,7 @@ func (f *FederationEngineConfigFactory) BuildEngineConfigurationWithHeader(route
 }
 
 func (f *FederationEngineConfigFactory) createPlannerConfigurationWithHeaders(routerConfig *nodev1.RouterConfig,
-	header http.Header) (*plan.Configuration, error) {
+	header http.Header, rolloutConfigs []SubgraphRolloutConfig) (*plan.Configuration, error) {
 	var (
 		outConfig plan.Configuration
 	)
@@ -218,12 +227,19 @@ func (f *FederationEngineConfigFactory) createPlannerConfigurationWithHeaders(ro
 		})
 	}
 
+	// convert rolloutConfigs to map, key is Id
+	rolloutConfigsMap := make(map[string]SubgraphRolloutConfig)
+	for _, config := range rolloutConfigs {
+		rolloutConfigsMap[config.Id] = config
+	}
+
 	for _, ds := range engineConfig.DatasourceConfigurations {
 		if ds.Kind != nodev1.DataSourceKind_GRAPHQL {
 			return nil, fmt.Errorf("invalid datasource kind %q", ds.Kind)
 		}
 
-		dataSource, err := f.subgraphDataSourceConfigurationWithHeaders(engineConfig, ds, header)
+		rolloutConfig := rolloutConfigsMap[ds.Id]
+		dataSource, err := f.subgraphDataSourceConfigurationWithHeaders(engineConfig, ds, header, rolloutConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create data source configuration for data source %s: %w", ds.Id, err)
 		}
@@ -235,7 +251,7 @@ func (f *FederationEngineConfigFactory) createPlannerConfigurationWithHeaders(ro
 }
 
 func (f *FederationEngineConfigFactory) subgraphDataSourceConfigurationWithHeaders(engineConfig *nodev1.EngineConfiguration,
-	in *nodev1.DataSourceConfiguration, headerToAdd http.Header) (plan.DataSource, error) {
+	in *nodev1.DataSourceConfiguration, headerToAdd http.Header, rolloutConfig SubgraphRolloutConfig) (plan.DataSource, error) {
 	var out plan.DataSource
 
 	factory, err := f.graphqlDataSourceFactory()
@@ -333,11 +349,15 @@ func (f *FederationEngineConfigFactory) subgraphDataSourceConfigurationWithHeade
 		return nil, fmt.Errorf("error creating custom configuration for data source %s: %w", in.Id, err)
 	}
 
-	out, err = plan.NewDataSourceConfiguration[graphql_datasource.Configuration](
+	out, err = plan.NewDataSourceConfigurationWithRolloutConfig[graphql_datasource.Configuration](
 		in.Id,
 		factory,
 		f.dataSourceMetaData(in),
 		customConfiguration,
+		rolloutConfig.IsPrimaryDataSource,
+		rolloutConfig.RolloutPercentage,
+		rolloutConfig.IsRolloutEnabled,
+		rolloutConfig.NodeRolloutConfigs,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating data source configuration for data source %s: %w", in.Id, err)
