@@ -187,13 +187,13 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Reques
 
 	cachedPlan := e.getCachedPlan(execContext, operation.Document(), e.config.schema.Document(), operation.OperationName, &report)
 	if report.HasErrors() {
-		resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan.NodeSuggestions()))
+		resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan))
 		return report, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
 	traceTimings.EndPlanning()
 
-	resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan.NodeSuggestions()))
+	resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan))
 	switch p := cachedPlan.(type) {
 	case *plan.SynchronousResponsePlan:
 		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer, traceTimings)
@@ -241,8 +241,16 @@ func (e *ExecutionEngine) GetWebsocketBeforeStartHook() WebsocketBeforeStartHook
 	return e.config.websocketBeforeStartHook
 }
 
-func suggestionsToPlanningStats(suggestions []plan.NodeSuggestion) resolve.PlanningPathStats {
+func suggestionsToPlanningStats(planResult plan.Plan) resolve.PlanningPathStats {
 	planningPath := make(map[string]string)
+
+	if planResult == nil || planResult.NodeSuggestions() == nil {
+		return resolve.PlanningPathStats{
+			PlanningPath: planningPath,
+		}
+	}
+	suggestions := planResult.NodeSuggestions()
+
 	for _, suggestion := range suggestions {
 		if suggestion.Selected && suggestion.IsRootNode && (suggestion.TypeName == "Query" || suggestion.TypeName == "Mutation") {
 			planningPath[suggestion.Path] = suggestion.DataSourceID
