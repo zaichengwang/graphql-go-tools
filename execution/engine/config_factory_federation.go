@@ -159,17 +159,17 @@ func (f *FederationEngineConfigFactory) BuildEngineConfigurationWithHeader(route
 
 	// uncomment for plan detail debugging
 
-	//plannerConfiguration.Debug = plan.DebugConfiguration{
-	//	PrintOperationTransformations: true,
-	//	PrintOperationEnableASTRefs:   true,
-	//	PrintPlanningPaths:            true,
-	//	PrintQueryPlans:               true,
-	//	PrintNodeSuggestions:          true,
-	//
-	//	ConfigurationVisitor: true,
-	//	PlanningVisitor:      true,
-	//	DatasourceVisitor:    true,
-	//}
+	plannerConfiguration.Debug = plan.DebugConfiguration{
+		PrintOperationTransformations: true,
+		PrintOperationEnableASTRefs:   true,
+		PrintPlanningPaths:            true,
+		PrintQueryPlans:               true,
+		PrintNodeSuggestions:          true,
+
+		ConfigurationVisitor: true,
+		PlanningVisitor:      true,
+		DatasourceVisitor:    true,
+	}
 
 	schemaSDL := intermediateConfig.EngineConfig.GraphqlSchema
 
