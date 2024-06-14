@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 	"io"
 	"net/http"
 	"time"
@@ -164,16 +165,17 @@ func (c *Context) Free() {
 type traceStartKey struct{}
 
 type TraceInfo struct {
-	TraceStart        time.Time         `json:"-"`
-	TraceStartTime    string            `json:"trace_start_time"`
-	TraceStartUnix    int64             `json:"trace_start_unix"`
-	ParseStats        PhaseStats        `json:"parse_stats"`
-	NormalizeStats    PhaseStats        `json:"normalize_stats"`
-	ValidateStats     PhaseStats        `json:"validate_stats"`
-	PlannerStats      PhaseStats        `json:"planner_stats"`
-	LoadResponseStats PhaseStats        `json:"load_response_stats"`
-	ResolveStats      PhaseStats        `json:"resolve_stats"`
-	PlanningPathStats PlanningPathStats `json:"planning_path_stats"`
+	TraceStart        time.Time            `json:"-"`
+	TraceStartTime    string               `json:"trace_start_time"`
+	TraceStartUnix    int64                `json:"trace_start_unix"`
+	ParseStats        PhaseStats           `json:"parse_stats"`
+	NormalizeStats    PhaseStats           `json:"normalize_stats"`
+	ValidateStats     PhaseStats           `json:"validate_stats"`
+	PlannerStats      PhaseStats           `json:"planner_stats"`
+	LoadResponseStats PhaseStats           `json:"load_response_stats"`
+	ResolveStats      PhaseStats           `json:"resolve_stats"`
+	PlanningPathStats PlanningPathStats    `json:"planning_path_stats"`
+	HttpCallData      httpclient.TraceHTTP `json:"http_call_data,omitempty"`
 	debug             bool
 }
 
@@ -278,4 +280,16 @@ func SetResolveStats(ctx context.Context, stats PhaseStats) {
 		return
 	}
 	info.ResolveStats = SetDebugStats(info, stats, 6)
+}
+
+func SetHttpCallData(ctx context.Context, data json.RawMessage) {
+	info := GetTraceInfo(ctx)
+	if info == nil {
+		return
+	}
+	traceHttp := httpclient.TraceHTTP{}
+	if err := json.Unmarshal(data, &traceHttp); err != nil {
+		return
+	}
+	info.HttpCallData = traceHttp
 }

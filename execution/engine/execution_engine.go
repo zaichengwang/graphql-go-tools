@@ -203,6 +203,11 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Reques
 		return errors.New("execution of operation is not possible"), resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
+	if execContext.resolveContext != nil && execContext.resolveContext.Trace.Fetch != nil && execContext.resolveContext.Trace.Fetch.DataSourceLoadTrace != nil {
+		resolve.SetHttpCallData(execContext.resolveContext.Context(),
+			execContext.resolveContext.Trace.Fetch.DataSourceLoadTrace.HttpCallData)
+	}
+
 	return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 }
 
