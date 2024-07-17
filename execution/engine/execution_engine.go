@@ -136,27 +136,27 @@ func NewExecutionEngine(ctx context.Context, logger abstractlogger.Logger, engin
 
 func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Request, writer resolve.SubscriptionResponseWriter, options ...ExecutionOptions) (error, *resolve.TraceInfo) {
 
-	execContext := e.prepareExecutionContext(ctx, operation, options...)
+	execContext := e.PrepareExecutionContext(ctx, operation, options...)
 	traceTimings := resolve.NewTraceTimings(execContext.resolveContext.Context())
 
-	if err := e.normalizeOperation(operation, execContext, traceTimings); err != nil {
+	if err := e.NormalizeOperation(operation, execContext, traceTimings); err != nil {
 		return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
-	if err := e.validateOperation(operation, execContext, traceTimings); err != nil {
+	if err := e.ValidateOperation(operation, execContext, traceTimings); err != nil {
 		return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
 	execContext.prepare(execContext.resolveContext.Context(), operation.Variables, operation.InternalRequest(), options...)
 	var report operationreport.Report
 
-	cachedPlan, err := e.planOperation(operation, execContext, traceTimings, report)
+	cachedPlan, err := e.PlanOperation(operation, execContext, traceTimings, report)
 	if err != nil {
 		return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
 	resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan))
-	err = e.executePlan(execContext, writer, traceTimings, cachedPlan)
+	err = e.ExecutePlan(execContext, writer, traceTimings, cachedPlan)
 	if err != nil {
 		return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
@@ -224,7 +224,7 @@ func suggestionsToPlanningStats(planResult plan.Plan) resolve.PlanningPathStats 
 	}
 }
 
-func (e *ExecutionEngine) prepareExecutionContext(ctx context.Context, operation *graphql.Request, options ...ExecutionOptions) *internalExecutionContext {
+func (e *ExecutionEngine) PrepareExecutionContext(ctx context.Context, operation *graphql.Request, options ...ExecutionOptions) *internalExecutionContext {
 	execContext := newInternalExecutionContext()
 	execContext.setContext(ctx)
 
@@ -242,7 +242,7 @@ func (e *ExecutionEngine) prepareExecutionContext(ctx context.Context, operation
 	return execContext
 }
 
-func (e *ExecutionEngine) normalizeOperation(operation *graphql.Request, execContext *internalExecutionContext, traceTimings *resolve.TraceTimings) error {
+func (e *ExecutionEngine) NormalizeOperation(operation *graphql.Request, execContext *internalExecutionContext, traceTimings *resolve.TraceTimings) error {
 	traceTimings.StartNormalize()
 	defer traceTimings.EndNormalize()
 
@@ -262,7 +262,7 @@ func (e *ExecutionEngine) normalizeOperation(operation *graphql.Request, execCon
 	return nil
 }
 
-func (e *ExecutionEngine) validateOperation(operation *graphql.Request, execContext *internalExecutionContext, traceTimings *resolve.TraceTimings) error {
+func (e *ExecutionEngine) ValidateOperation(operation *graphql.Request, execContext *internalExecutionContext, traceTimings *resolve.TraceTimings) error {
 	traceTimings.StartValidate()
 	defer traceTimings.EndValidate()
 
@@ -279,7 +279,7 @@ func (e *ExecutionEngine) validateOperation(operation *graphql.Request, execCont
 	return nil
 }
 
-func (e *ExecutionEngine) planOperation(operation *graphql.Request, execContext *internalExecutionContext, traceTimings *resolve.TraceTimings, report operationreport.Report) (plan.Plan, error) {
+func (e *ExecutionEngine) PlanOperation(operation *graphql.Request, execContext *internalExecutionContext, traceTimings *resolve.TraceTimings, report operationreport.Report) (plan.Plan, error) {
 	traceTimings.StartPlanning()
 	defer traceTimings.EndPlanning()
 
@@ -293,7 +293,7 @@ func (e *ExecutionEngine) planOperation(operation *graphql.Request, execContext 
 	return cachedPlan, nil
 }
 
-func (e *ExecutionEngine) executePlan(execContext *internalExecutionContext, writer resolve.SubscriptionResponseWriter, traceTimings *resolve.TraceTimings, cachedPlan interface{}) error {
+func (e *ExecutionEngine) ExecutePlan(execContext *internalExecutionContext, writer resolve.SubscriptionResponseWriter, traceTimings *resolve.TraceTimings, cachedPlan interface{}) error {
 	switch p := cachedPlan.(type) {
 	case *plan.SynchronousResponsePlan:
 		return e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer, traceTimings)
