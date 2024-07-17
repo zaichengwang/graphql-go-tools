@@ -136,71 +136,29 @@ func NewExecutionEngine(ctx context.Context, logger abstractlogger.Logger, engin
 
 func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Request, writer resolve.SubscriptionResponseWriter, options ...ExecutionOptions) (error, *resolve.TraceInfo) {
 
-	execContext := newInternalExecutionContext()
-	execContext.setContext(ctx)
-
-	for i := range options {
-		options[i](execContext)
-	}
-
-	execContext.prepare(ctx, operation.Variables, operation.InternalRequest(), options...)
-
-	if execContext.resolveContext.TracingOptions.Enable {
-		traceCtx := resolve.SetTraceStart(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions.EnablePredictableDebugTimings)
-		execContext.setContext(traceCtx)
-	}
+	execContext := e.prepareExecutionContext(ctx, operation, options...)
 	traceTimings := resolve.NewTraceTimings(execContext.resolveContext.Context())
 
-	traceTimings.StartNormalize()
-	if !operation.IsNormalized() {
-		result, err := operation.Normalize(e.config.schema)
-		if err != nil {
-			resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
-			return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
-		}
-
-		if !result.Successful {
-			resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
-			return result.Errors, resolve.GetTraceInfo(execContext.resolveContext.Context())
-		}
-	}
-	traceTimings.EndNormalize()
-
-	traceTimings.StartValidate()
-
-	result, err := operation.ValidateForSchema(e.config.schema)
-	if err != nil {
-		resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+	if err := e.normalizeOperation(operation, execContext, traceTimings); err != nil {
 		return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
-	if !result.Valid {
-		resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
-		return result.Errors, resolve.GetTraceInfo(execContext.resolveContext.Context())
-	}
 
-	traceTimings.EndValidate()
+	if err := e.validateOperation(operation, execContext, traceTimings); err != nil {
+		return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
+	}
 
 	execContext.prepare(execContext.resolveContext.Context(), operation.Variables, operation.InternalRequest(), options...)
 	var report operationreport.Report
 
-	traceTimings.StartPlanning()
-
-	cachedPlan := e.getCachedPlan(execContext, operation.Document(), e.config.schema.Document(), operation.OperationName, &report)
-	if report.HasErrors() {
-		resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan))
-		return report, resolve.GetTraceInfo(execContext.resolveContext.Context())
+	cachedPlan, err := e.planOperation(operation, execContext, traceTimings, report)
+	if err != nil {
+		return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
-	traceTimings.EndPlanning()
-
 	resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan))
-	switch p := cachedPlan.(type) {
-	case *plan.SynchronousResponsePlan:
-		err = e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer, traceTimings)
-	case *plan.SubscriptionResponsePlan:
-		err = e.resolver.ResolveGraphQLSubscription(execContext.resolveContext, p.Response, writer)
-	default:
-		return errors.New("execution of operation is not possible"), resolve.GetTraceInfo(execContext.resolveContext.Context())
+	err = e.executePlan(execContext, writer, traceTimings, cachedPlan)
+	if err != nil {
+		return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
 	}
 
 	if execContext.resolveContext != nil && execContext.resolveContext.Trace.Fetch != nil && execContext.resolveContext.Trace.Fetch.DataSourceLoadTrace != nil {
@@ -208,7 +166,7 @@ func (e *ExecutionEngine) Execute(ctx context.Context, operation *graphql.Reques
 			execContext.resolveContext.Trace.Fetch.DataSourceLoadTrace.HttpCallData)
 	}
 
-	return err, resolve.GetTraceInfo(execContext.resolveContext.Context())
+	return nil, resolve.GetTraceInfo(execContext.resolveContext.Context())
 }
 
 func (e *ExecutionEngine) getCachedPlan(ctx *internalExecutionContext, operation, definition *ast.Document, operationName string, report *operationreport.Report) plan.Plan {
@@ -263,5 +221,85 @@ func suggestionsToPlanningStats(planResult plan.Plan) resolve.PlanningPathStats 
 	}
 	return resolve.PlanningPathStats{
 		PlanningPath: planningPath,
+	}
+}
+
+func (e *ExecutionEngine) prepareExecutionContext(ctx context.Context, operation *graphql.Request, options ...ExecutionOptions) *internalExecutionContext {
+	execContext := newInternalExecutionContext()
+	execContext.setContext(ctx)
+
+	for i := range options {
+		options[i](execContext)
+	}
+
+	execContext.prepare(ctx, operation.Variables, operation.InternalRequest(), options...)
+
+	if execContext.resolveContext.TracingOptions.Enable {
+		traceCtx := resolve.SetTraceStart(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions.EnablePredictableDebugTimings)
+		execContext.setContext(traceCtx)
+	}
+
+	return execContext
+}
+
+func (e *ExecutionEngine) normalizeOperation(operation *graphql.Request, execContext *internalExecutionContext, traceTimings *resolve.TraceTimings) error {
+	traceTimings.StartNormalize()
+	defer traceTimings.EndNormalize()
+
+	if !operation.IsNormalized() {
+		result, err := operation.Normalize(e.config.schema)
+		if err != nil {
+			resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+			return err
+		}
+
+		if !result.Successful {
+			resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+			return result.Errors
+		}
+	}
+
+	return nil
+}
+
+func (e *ExecutionEngine) validateOperation(operation *graphql.Request, execContext *internalExecutionContext, traceTimings *resolve.TraceTimings) error {
+	traceTimings.StartValidate()
+	defer traceTimings.EndValidate()
+
+	result, err := operation.ValidateForSchema(e.config.schema)
+	if err != nil {
+		resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+		return err
+	}
+	if !result.Valid {
+		resolve.SetRequestTracingStats(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings)
+		return result.Errors
+	}
+
+	return nil
+}
+
+func (e *ExecutionEngine) planOperation(operation *graphql.Request, execContext *internalExecutionContext, traceTimings *resolve.TraceTimings, report operationreport.Report) (plan.Plan, error) {
+	traceTimings.StartPlanning()
+	defer traceTimings.EndPlanning()
+
+	cachedPlan := e.getCachedPlan(execContext, operation.Document(), e.config.schema.Document(), operation.OperationName, &report)
+	if report.HasErrors() {
+		resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan))
+		return nil, report
+	}
+
+	resolve.SetPlanningTracingStat(execContext.resolveContext.Context(), execContext.resolveContext.TracingOptions, traceTimings, suggestionsToPlanningStats(cachedPlan))
+	return cachedPlan, nil
+}
+
+func (e *ExecutionEngine) executePlan(execContext *internalExecutionContext, writer resolve.SubscriptionResponseWriter, traceTimings *resolve.TraceTimings, cachedPlan interface{}) error {
+	switch p := cachedPlan.(type) {
+	case *plan.SynchronousResponsePlan:
+		return e.resolver.ResolveGraphQLResponse(execContext.resolveContext, p.Response, nil, writer, traceTimings)
+	case *plan.SubscriptionResponsePlan:
+		return e.resolver.ResolveGraphQLSubscription(execContext.resolveContext, p.Response, writer)
+	default:
+		return errors.New("execution of operation is not possible")
 	}
 }
