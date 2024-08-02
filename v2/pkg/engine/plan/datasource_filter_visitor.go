@@ -236,7 +236,7 @@ func (f *DataSourceFilter) selectFromDuplicateRootNodes() bool {
 			}
 
 			// Select a node based on rollout percentage
-			randomNumber := rand.Intn(101)
+			randomNumber := rand.Intn(100) + 1 // a number of [1, 100]
 			selectedNodeIndex := primaryNodeIndex
 			if randomNumber > f.nodes.items[primaryNodeIndex].rolloutPercentage {
 				// Select the non-primary node
@@ -250,6 +250,9 @@ func (f *DataSourceFilter) selectFromDuplicateRootNodes() bool {
 
 			// Apply the selection
 			f.nodes.items[selectedNodeIndex].selectWithReason(ReasonStage3SelectBasedOnRolloutConfig, f.enableSelectionReasons)
+			if f.nodes.items[selectedNodeIndex].Path == "query.searchAnalyticsEntity" && f.nodes.items[selectedNodeIndex].DataSourceID == "0" {
+				print("selectedNodeIndex: %v, %v", selectedNodeIndex, randomNumber)
+			}
 			// we expect only has 1 root node
 			return true
 			//queryExecutionReport.PlanDecisionMap[nodes[selectedNodeIndex].Path] = nodes[selectedNodeIndex].DataSourceID
