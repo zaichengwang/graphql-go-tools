@@ -595,12 +595,40 @@ func (r *result) init(postProcessing PostProcessingConfiguration, info *FetchInf
 }
 
 var (
-	errorsInvalidInputHeader = []byte(`{"errors":[{"message":"could not render fetch input","path":[`)
-	errorsInvalidInputFooter = []byte(`]}]}`)
+	errorsInvalidInputHeader = []byte(`{"errors":[{"message":"Failed to render Fetch Input `)
+
+	errorsDetailReasonFooter     = []byte(`"`)
+	errorsInvalidInputPassHeader = []byte(`,"path":[`)
+	errorsInvalidInputFooter     = []byte(`]}]}`)
 )
 
-func (l *Loader) renderErrorsInvalidInput(out *bytes.Buffer) error {
+func hideSchemaFilePath(err error) string {
+	errorString := err.Error()
+
+	// Find the start of the file path
+	startIndex := strings.Index(errorString, "file://")
+
+	// Find the end of the file path
+	endIndex := strings.Index(errorString, "schema.json")
+
+	// Check if both the start and end of the file path were found
+	if startIndex != -1 && endIndex != -1 {
+		// Add the length of "schema.json" to the end index to include it in the substring
+		endIndex += len("schema.json")
+
+		// Remove the file path from the error string
+		errorString = errorString[:startIndex] + errorString[endIndex:]
+	}
+	return errorString
+
+}
+
+func (l *Loader) renderErrorsInvalidInput(out *bytes.Buffer, err error) error {
 	_, _ = out.Write(errorsInvalidInputHeader)
+	_, _ = out.Write([]byte(hideSchemaFilePath(err)))
+	_, _ = out.Write(errorsDetailReasonFooter)
+
+	_, _ = out.Write(errorsInvalidInputPassHeader)
 	for i := range l.path {
 		if i != 0 {
 			_, _ = out.Write(comma)
@@ -996,7 +1024,7 @@ func (l *Loader) loadSingleFetch(ctx context.Context, fetch *SingleFetch, items 
 	}
 	err = fetch.InputTemplate.Render(l.ctx, input.Bytes(), preparedInput)
 	if err != nil {
-		return l.renderErrorsInvalidInput(res.out)
+		return l.renderErrorsInvalidInput(res.out, err)
 	}
 	fetchInput := preparedInput.Bytes()
 	allowed, err := l.validatePreFetch(fetchInput, fetch.Info, res)
