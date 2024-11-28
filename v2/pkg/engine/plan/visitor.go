@@ -216,7 +216,27 @@ func (v *Visitor) EnterDirective(ref int) {
 		case "defer":
 			v.currentField.Defer = &resolve.DeferField{}
 		}
+		// Add auth directive handling
+		if fieldConfig := v.getCurrentFieldConfig(); fieldConfig != nil {
+			authHandler := NewAuthDirectiveHandler(v.Operation, v.Definition)
+			authHandler.HandleAuthDirective(ref, fieldConfig)
+		}
 	}
+}
+
+func (v *Visitor) getCurrentFieldConfig() *FieldConfiguration {
+	if len(v.Walker.Ancestors) == 0 {
+		return nil
+	}
+
+	ancestor := v.Walker.Ancestors[len(v.Walker.Ancestors)-1]
+	if ancestor.Kind != ast.NodeKindField {
+		return nil
+	}
+
+	typeName := v.Walker.EnclosingTypeDefinition.NameString(v.Definition)
+	fieldName := v.Operation.FieldNameString(ancestor.Ref)
+	return v.Config.Fields.ForTypeField(typeName, fieldName)
 }
 
 func (v *Visitor) EnterInlineFragment(ref int) {
@@ -421,6 +441,19 @@ func (v *Visitor) resolveFieldInfo(ref, typeRef int, onTypeNames [][]byte) *reso
 			sourceIDs = append(sourceIDs, v.planners[i].DataSourceConfiguration().Id())
 		}
 	}
+
+	fieldConfig := v.Config.Fields.ForTypeField(enclosingTypeName, fieldName)
+	authDirectives := make(map[string]resolve.DirectiveInfo)
+
+	if fieldConfig != nil && fieldConfig.Directives != nil {
+		for directiveName, directive := range fieldConfig.Directives {
+			authDirectives[directiveName] = resolve.DirectiveInfo{
+				Name:      directive.DirectiveName,
+				Arguments: directive.Arguments,
+			}
+		}
+	}
+
 	return &resolve.FieldInfo{
 		Name:            fieldName,
 		NamedType:       typeName,
@@ -430,6 +463,7 @@ func (v *Visitor) resolveFieldInfo(ref, typeRef int, onTypeNames [][]byte) *reso
 		},
 		ExactParentTypeName:  enclosingTypeName,
 		HasAuthorizationRule: fieldHasAuthorizationRule,
+		AuthDirectives:       authDirectives,
 	}
 }
 

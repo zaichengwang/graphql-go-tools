@@ -100,6 +100,13 @@ type FieldInfo struct {
 	FetchID   int
 	// HasAuthorizationRule needs to be set to true if the Authorizer should be called for this field
 	HasAuthorizationRule bool
+
+	AuthDirectives map[string]DirectiveInfo
+}
+
+type DirectiveInfo struct {
+	Name      string
+	Arguments map[string]interface{}
 }
 
 func (i *FieldInfo) Merge(other *FieldInfo) {

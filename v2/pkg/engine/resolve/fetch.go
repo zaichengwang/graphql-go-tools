@@ -1,6 +1,7 @@
 package resolve
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
@@ -176,9 +177,25 @@ type FetchInfo struct {
 }
 
 type GraphCoordinate struct {
-	TypeName             string `json:"typeName"`
-	FieldName            string `json:"fieldName"`
-	HasAuthorizationRule bool   `json:"-"`
+	TypeName             string          `json:"typeName"`
+	FieldName            string          `json:"fieldName"`
+	HasAuthorizationRule bool            `json:"-"`
+	AuthDirectives       json.RawMessage `json:"authDirectives,omitempty"`
+}
+
+type DirectiveConfig struct {
+	Name      string                 `json:"name"`
+	Arguments map[string]interface{} `json:"arguments,omitempty"`
+}
+
+// Equal implements custom equality check for GraphCoordinate
+func (g GraphCoordinate) Equal(other GraphCoordinate) bool {
+	if g.TypeName != other.TypeName ||
+		g.FieldName != other.FieldName ||
+		g.HasAuthorizationRule != other.HasAuthorizationRule {
+		return false
+	}
+	return bytes.Equal(g.AuthDirectives, other.AuthDirectives)
 }
 
 type DataSourceLoadTrace struct {

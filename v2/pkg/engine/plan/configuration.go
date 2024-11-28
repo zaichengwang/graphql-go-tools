@@ -98,6 +98,9 @@ type FieldConfiguration struct {
 	HasAuthorizationRule bool
 
 	SubscriptionFilterCondition *SubscriptionFilterCondition
+
+	// Add generic directive support
+	Directives map[string]DirectiveConfiguration
 }
 
 type SubscriptionFilterCondition struct {

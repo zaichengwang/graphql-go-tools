@@ -106,9 +106,10 @@ func TestResolver_ResolveNode(t *testing.T) {
 
 		return func(t *testing.T) {
 			buf := &bytes.Buffer{}
+			tracingTiming := NewTraceTimings(ctx.ctx)
 			err := r.ResolveGraphQLResponse(&ctx, &GraphQLResponse{
 				Data: node,
-			}, nil, buf, nil)
+			}, nil, buf, tracingTiming)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedOutput, buf.String())
 			ctrl.Finish()
@@ -126,9 +127,10 @@ func TestResolver_ResolveNode(t *testing.T) {
 		return func(t *testing.T) {
 			t.Helper()
 			buf := &bytes.Buffer{}
+			tracingTiming := NewTraceTimings(ctx.ctx)
 			err := r.ResolveGraphQLResponse(&ctx, &GraphQLResponse{
 				Data: node,
-			}, nil, buf, nil)
+			}, nil, buf, tracingTiming)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedErr, buf.String())
 			ctrl.Finish()
@@ -1485,7 +1487,8 @@ func testFn(fn func(t *testing.T, ctrl *gomock.Controller) (node *GraphQLRespons
 		}
 
 		buf := &bytes.Buffer{}
-		err := r.ResolveGraphQLResponse(&ctx, node, nil, buf, nil)
+		tracingTiming := NewTraceTimings(ctx.ctx)
+		err := r.ResolveGraphQLResponse(&ctx, node, nil, buf, tracingTiming)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutput, buf.String())
 		ctrl.Finish()
@@ -1540,7 +1543,8 @@ func testFnNoSubgraphErrorForwarding(fn func(t *testing.T, ctrl *gomock.Controll
 		}
 
 		buf := &bytes.Buffer{}
-		err := r.ResolveGraphQLResponse(&ctx, node, nil, buf, nil)
+		tracingTiming := NewTraceTimings(ctx.ctx)
+		err := r.ResolveGraphQLResponse(&ctx, node, nil, buf, tracingTiming)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutput, buf.String())
 		ctrl.Finish()
@@ -1562,7 +1566,8 @@ func testFnWithPostEvaluation(fn func(t *testing.T, ctrl *gomock.Controller) (no
 		}
 
 		buf := &bytes.Buffer{}
-		err := r.ResolveGraphQLResponse(ctx, node, nil, buf, nil)
+		tracingTiming := NewTraceTimings(ctx.ctx)
+		err := r.ResolveGraphQLResponse(ctx, node, nil, buf, tracingTiming)
 		assert.NoError(t, err)
 		assert.Equal(t, expectedOutput, buf.String())
 		ctrl.Finish()
@@ -1584,8 +1589,10 @@ func testFnWithError(fn func(t *testing.T, ctrl *gomock.Controller) (node *Graph
 			return
 		}
 
+		tracingTiming := NewTraceTimings(ctx.ctx)
+
 		buf := &bytes.Buffer{}
-		err := r.ResolveGraphQLResponse(&ctx, node, nil, buf, nil)
+		err := r.ResolveGraphQLResponse(&ctx, node, nil, buf, tracingTiming)
 		assert.Error(t, err, expectedOutput)
 		ctrl.Finish()
 	}

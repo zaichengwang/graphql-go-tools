@@ -154,7 +154,8 @@ func TestLoaderHooks_FetchPipeline(t *testing.T) {
 		}
 
 		buf := &bytes.Buffer{}
-		err := r.ResolveGraphQLResponse(resolveCtx, resp, nil, buf, nil)
+		tracingTiming := NewTraceTimings(context.Background())
+		err := r.ResolveGraphQLResponse(resolveCtx, resp, nil, buf, tracingTiming)
 		assert.NoError(t, err)
 		assert.Equal(t, `{"errors":[{"message":"Failed to fetch from Subgraph 'Users' at Path 'query'."}],"data":{"name":null}}`, buf.String())
 		ctrl.Finish()

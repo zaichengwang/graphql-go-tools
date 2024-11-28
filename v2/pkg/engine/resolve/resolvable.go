@@ -524,6 +524,14 @@ func (r *Resolvable) authorizeField(ref int, field *Field) (skipField bool) {
 		TypeName:  typeName,
 		FieldName: fieldName,
 	}
+
+	if len(field.Info.AuthDirectives) > 0 {
+		directivesJSON, err := json.Marshal(field.Info.AuthDirectives)
+		if err == nil {
+			gc.AuthDirectives = directivesJSON
+		}
+	}
+
 	result, authErr := r.authorize(ref, dataSourceID, gc)
 	if authErr != nil {
 		r.authorizationError = authErr
