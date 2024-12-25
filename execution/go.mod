@@ -72,3 +72,4 @@ require (
 // this is a workaround to make sure that the correct version is used
 // as we cannot pin the specific version in go mod
 replace github.com/99designs/gqlgen => github.com/99designs/gqlgen v0.17.22
+replace github.com/wundergraph/graphql-go-tools/v2 => github.com/zaichengwang/graphql-go-tools/v2 v2.0.0-rc.20.0.20241204033149-2fffcf4d7726
