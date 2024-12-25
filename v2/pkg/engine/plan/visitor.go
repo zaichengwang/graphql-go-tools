@@ -416,7 +416,7 @@ func (v *Visitor) resolveFieldInfo(ref, typeRef int, onTypeNames [][]byte) *reso
 	underlyingType := v.Definition.ResolveUnderlyingType(typeRef)
 	typeName := v.Definition.ResolveTypeNameString(typeRef)
 
-	hasAuthDirective := v.Config.HasFieldAuthDirective(typeName, fieldName)
+	hasAuthDirective := v.Config.HasFieldAuthDirective(enclosingTypeName, fieldName)
 
 	if !v.Config.IncludeInfo && !hasAuthDirective {
 		return nil
@@ -458,7 +458,7 @@ func (v *Visitor) resolveFieldInfo(ref, typeRef int, onTypeNames [][]byte) *reso
 	}
 
 	if hasAuthDirective {
-		directivesFromConfig := v.Config.GetFieldAuthDirectives(typeName, fieldName)
+		directivesFromConfig := v.Config.GetFieldAuthDirectives(enclosingTypeName, fieldName)
 		for _, directive := range directivesFromConfig {
 			authDirectives[directive.DirectiveName] = resolve.DirectiveInfo{
 				Name:      directive.DirectiveName,

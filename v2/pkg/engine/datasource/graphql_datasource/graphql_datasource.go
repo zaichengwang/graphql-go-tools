@@ -11,7 +11,6 @@ import (
 	"slices"
 
 	"github.com/buger/jsonparser"
-	"github.com/cespare/xxhash/v2"
 	"github.com/jensneuse/abstractlogger"
 	"github.com/tidwall/sjson"
 
@@ -589,32 +588,6 @@ func (p *Planner[T]) EnterField(ref int) {
 
 	fieldName := p.visitor.Operation.FieldNameString(ref)
 	fieldConfiguration := p.visitor.Config.Fields.ForTypeField(p.lastFieldEnclosingTypeName, fieldName)
-
-	//// Get schema with directives
-	typeName := p.lastFieldEnclosingTypeName
-	// Check if field has specific directive
-	if directives := p.config.schemaConfiguration.GetFieldDirectives(typeName, fieldName); directives != nil {
-		// Create new FieldConfiguration if it's nil
-		if fieldConfiguration == nil {
-			fieldConfiguration = &plan.FieldConfiguration{
-				TypeName:  typeName,
-				FieldName: fieldName,
-			}
-			// Add the new configuration to visitor's config
-			p.visitor.Config.Fields = append(p.visitor.Config.Fields, *fieldConfiguration)
-		}
-		if fieldConfiguration.Directives == nil {
-			fieldConfiguration.Directives = make(map[string]plan.DirectiveConfiguration)
-		}
-		// Convert array of DirectiveConfiguration to map
-		for _, directive := range directives {
-			fieldConfiguration.Directives[directive.DirectiveName] = plan.DirectiveConfiguration{
-				DirectiveName: directive.DirectiveName,
-				RenameTo:      directive.RenameTo,
-				Arguments:     directive.Arguments,
-			}
-		}
-	}
 
 	for i := range p.config.customScalarTypeFields {
 		if p.config.customScalarTypeFields[i].TypeName == p.lastFieldEnclosingTypeName && p.config.customScalarTypeFields[i].FieldName == fieldName {
