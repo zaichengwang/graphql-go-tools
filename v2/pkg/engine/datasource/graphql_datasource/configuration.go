@@ -9,6 +9,7 @@ import (
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astparser"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/asttransform"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/plan"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/federation"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/operationreport"
 )
@@ -25,6 +26,10 @@ type Configuration struct {
 	subscription           *SubscriptionConfiguration
 	schemaConfiguration    SchemaConfiguration
 	customScalarTypeFields []SingleTypeField
+}
+
+func (c *Configuration) FieldDirectives() map[string]map[string][]plan.DirectiveConfiguration {
+	return c.schemaConfiguration.fieldDirectives
 }
 
 func NewConfiguration(input ConfigurationInput) (Configuration, error) {
@@ -123,6 +128,8 @@ type SchemaConfiguration struct {
 	upstreamSchema    string
 	upstreamSchemaAst *ast.Document
 	federation        *FederationConfiguration
+	// Change from []string to []DirectiveConfiguration
+	fieldDirectives map[string]map[string][]plan.DirectiveConfiguration
 }
 
 func (c *SchemaConfiguration) FederationServiceSDL() string {
@@ -138,7 +145,12 @@ func (c *SchemaConfiguration) IsFederationEnabled() bool {
 }
 
 func NewSchemaConfiguration(upstreamSchema string, federationCfg *FederationConfiguration) (*SchemaConfiguration, error) {
-	cfg := &SchemaConfiguration{upstreamSchema: upstreamSchema, federation: federationCfg}
+	cfg := &SchemaConfiguration{
+		upstreamSchema: upstreamSchema,
+		federation:     federationCfg,
+		// Initialize with the new type
+		fieldDirectives: make(map[string]map[string][]plan.DirectiveConfiguration),
+	}
 
 	if cfg.upstreamSchema == "" {
 		return nil, fmt.Errorf("upstream schema is required")
@@ -174,7 +186,71 @@ func NewSchemaConfiguration(upstreamSchema string, federationCfg *FederationConf
 		}
 	}
 
+	// Update directive indexing logic
+	for i := range definition.ObjectTypeDefinitions {
+		objectType := definition.ObjectTypeDefinitions[i]
+		if !objectType.HasFieldDefinitions {
+			continue
+		}
+
+		typeName := definition.ObjectTypeDefinitionNameString(i)
+		cfg.fieldDirectives[typeName] = make(map[string][]plan.DirectiveConfiguration)
+
+		for _, fieldDefRef := range objectType.FieldsDefinition.Refs {
+			fieldDef := definition.FieldDefinitions[fieldDefRef]
+			fieldName := definition.FieldDefinitionNameString(fieldDefRef)
+
+			if fieldDef.HasDirectives {
+				directives := make([]plan.DirectiveConfiguration, 0, len(fieldDef.Directives.Refs))
+				for _, directiveRef := range fieldDef.Directives.Refs {
+					directiveName := definition.DirectiveNameString(directiveRef)
+
+					// Create new DirectiveConfiguration
+					directive := plan.DirectiveConfiguration{
+						DirectiveName: directiveName,
+						Arguments:     make(map[string]interface{}),
+					}
+
+					// Optional: Parse directive arguments if they exist
+					if definition.Directives[directiveRef].HasArguments {
+						for _, argRef := range definition.Directives[directiveRef].Arguments.Refs {
+							argName := definition.ArgumentNameString(argRef)
+							directive.Arguments[argName] = definition.ArgumentValue(argRef)
+						}
+					}
+
+					directives = append(directives, directive)
+				}
+				cfg.fieldDirectives[typeName][fieldName] = directives
+			}
+		}
+	}
+
 	cfg.upstreamSchemaAst = definition
 
 	return cfg, nil
+}
+
+// Update the HasFieldDirective method to work with DirectiveConfiguration
+func (c *SchemaConfiguration) HasFieldDirective(typeName, fieldName, directiveName string) bool {
+	if fieldDirectives, ok := c.fieldDirectives[typeName]; ok {
+		if directives, ok := fieldDirectives[fieldName]; ok {
+			for _, d := range directives {
+				if d.DirectiveName == directiveName {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+// Add a new helper method to get the full directive configuration
+func (c *SchemaConfiguration) GetFieldDirectives(typeName, fieldName string) []plan.DirectiveConfiguration {
+	if fieldDirectives, ok := c.fieldDirectives[typeName]; ok {
+		if directives, ok := fieldDirectives[fieldName]; ok {
+			return directives
+		}
+	}
+	return nil
 }

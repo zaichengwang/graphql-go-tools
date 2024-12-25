@@ -409,15 +409,18 @@ func (v *Visitor) mapFieldConfig(ref int) {
 }
 
 func (v *Visitor) resolveFieldInfo(ref, typeRef int, onTypeNames [][]byte) *resolve.FieldInfo {
-	if !v.Config.IncludeInfo {
-		return nil
-	}
 
 	enclosingTypeName := v.Walker.EnclosingTypeDefinition.NameString(v.Definition)
 	fieldName := v.Operation.FieldNameString(ref)
 	fieldHasAuthorizationRule := v.fieldHasAuthorizationRule(enclosingTypeName, fieldName)
 	underlyingType := v.Definition.ResolveUnderlyingType(typeRef)
 	typeName := v.Definition.ResolveTypeNameString(typeRef)
+
+	hasAuthDirective := v.Config.HasFieldAuthDirective(typeName, fieldName)
+
+	if !v.Config.IncludeInfo && !hasAuthDirective {
+		return nil
+	}
 
 	// if the value is not a named type, try to resolve the underlying type
 	if underlyingType != -1 {
@@ -451,6 +454,17 @@ func (v *Visitor) resolveFieldInfo(ref, typeRef int, onTypeNames [][]byte) *reso
 				Name:      directive.DirectiveName,
 				Arguments: directive.Arguments,
 			}
+		}
+	}
+
+	if hasAuthDirective {
+		directivesFromConfig := v.Config.GetFieldAuthDirectives(typeName, fieldName)
+		for _, directive := range directivesFromConfig {
+			authDirectives[directive.DirectiveName] = resolve.DirectiveInfo{
+				Name:      directive.DirectiveName,
+				Arguments: directive.Arguments,
+			}
+
 		}
 	}
 

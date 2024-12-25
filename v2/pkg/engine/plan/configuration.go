@@ -2,9 +2,11 @@ package plan
 
 import (
 	"github.com/jensneuse/abstractlogger"
-
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/resolve"
 )
+
+// AuthDirectives defines the list of directives that are considered auth-related
+var AuthDirectives = []string{"nullifyUnauthorizedEdges"}
 
 type Configuration struct {
 	Logger                     abstractlogger.Logger
@@ -24,6 +26,43 @@ type Configuration struct {
 	// e.g. the origin of a field, possible types, etc.
 	// This information is required to compute the schema usage info from a plan
 	IncludeInfo bool
+
+	FieldDirectives map[string]map[string][]DirectiveConfiguration
+}
+
+func (c *Configuration) HasFieldAuthDirective(typeName, fieldName string) bool {
+	if fieldDirectives, ok := c.FieldDirectives[typeName]; ok {
+		if directives, ok := fieldDirectives[fieldName]; ok {
+			for _, d := range directives {
+				// Check if the directive name matches any of the auth directives
+				for _, authDirective := range AuthDirectives {
+					if d.DirectiveName == authDirective {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+func (c *Configuration) GetFieldAuthDirectives(typeName, fieldName string) []DirectiveConfiguration {
+	var result []DirectiveConfiguration
+
+	if fieldDirectives, ok := c.FieldDirectives[typeName]; ok {
+		if directives, ok := fieldDirectives[fieldName]; ok {
+			for _, d := range directives {
+				// Check if the directive name matches any of the auth directives
+				for _, authDirective := range AuthDirectives {
+					if d.DirectiveName == authDirective {
+						result = append(result, d)
+						break // Break inner loop once we find a match
+					}
+				}
+			}
+		}
+	}
+	return result
 }
 
 type DebugConfiguration struct {
