@@ -1,6 +1,7 @@
 package plan
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"slices"
@@ -422,6 +423,7 @@ func (c *configurationVisitor) addRootField(fieldRef, plannerIdx int) {
 
 	enclosingTypeName := c.walker.EnclosingTypeDefinition.NameString(c.definition)
 	fieldName := c.operation.FieldNameString(fieldRef)
+	fieldConfig := c.fieldConfigurations.ForTypeField(enclosingTypeName, fieldName)
 	fieldHasAuthorizationRule := c.fieldHasAuthorizationRule(enclosingTypeName, fieldName)
 
 	coordinate := resolve.GraphCoordinate{
@@ -430,10 +432,27 @@ func (c *configurationVisitor) addRootField(fieldRef, plannerIdx int) {
 		HasAuthorizationRule: fieldHasAuthorizationRule,
 	}
 
+	// Convert directives to JSON
+	if fieldConfig != nil && fieldConfig.Directives != nil {
+		directivesJSON, err := json.Marshal(fieldConfig.Directives)
+		if err == nil {
+			coordinate.AuthDirectives = directivesJSON
+		}
+	}
+
 	fetchConfiguration := c.planners[plannerIdx].ObjectFetchConfiguration()
-	if !slices.Contains(fetchConfiguration.rootFields, coordinate) {
+	if !containsGraphCoordinate(fetchConfiguration.rootFields, coordinate) {
 		fetchConfiguration.rootFields = append(fetchConfiguration.rootFields, coordinate)
 	}
+}
+
+func containsGraphCoordinate(slice []resolve.GraphCoordinate, item resolve.GraphCoordinate) bool {
+	for _, s := range slice {
+		if s.Equal(item) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *configurationVisitor) fieldHasAuthorizationRule(typeName, fieldName string) bool {

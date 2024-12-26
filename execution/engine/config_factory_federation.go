@@ -144,7 +144,7 @@ func (f *FederationEngineConfigFactory) ComposeRouterConfigString() (string, err
 }
 
 func (f *FederationEngineConfigFactory) BuildEngineConfigurationWithHeader(routerConfigString string,
-	header http.Header, rolloutConfigs []SubgraphRolloutConfig) (conf Configuration, err error) {
+	header http.Header, rolloutConfigs []SubgraphRolloutConfig, supportedAuthDirectives []string) (conf Configuration, err error) {
 
 	var intermediateConfig nodev1.RouterConfig
 	if err := protojson.Unmarshal([]byte(routerConfigString), &intermediateConfig); err != nil {
@@ -155,7 +155,28 @@ func (f *FederationEngineConfigFactory) BuildEngineConfigurationWithHeader(route
 	if err != nil {
 		return Configuration{}, err
 	}
+
+	fieldDirectives := make(map[string]map[string][]plan.DirectiveConfiguration)
+
+	for _, dataSource := range plannerConfiguration.DataSources {
+		// Type assert to get the generic DataSourceConfiguration interface
+		if dsConfig, ok := dataSource.(plan.DataSourceConfiguration[graphql_datasource.Configuration]); ok {
+			customConfig := dsConfig.CustomConfiguration()
+			// merge field directives
+			for typeName, fieldDirectivesMap := range customConfig.FieldDirectives() {
+				if _, ok := fieldDirectives[typeName]; !ok {
+					fieldDirectives[typeName] = make(map[string][]plan.DirectiveConfiguration)
+				}
+				for fieldName, directives := range fieldDirectivesMap {
+					fieldDirectives[typeName][fieldName] = append(fieldDirectives[typeName][fieldName], directives...)
+				}
+			}
+
+		}
+	}
 	plannerConfiguration.DefaultFlushIntervalMillis = DefaultFlushIntervalInMilliseconds
+	plannerConfiguration.FieldDirectives = fieldDirectives
+	plannerConfiguration.SupportedAuthDirectives = supportedAuthDirectives
 
 	// uncomment for plan detail debugging
 

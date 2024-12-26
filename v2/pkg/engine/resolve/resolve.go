@@ -177,6 +177,9 @@ func (r *Resolver) ResolveGraphQLResponse(ctx *Context, response *GraphQLRespons
 			OperationType: ast.OperationTypeQuery,
 		}
 	}
+	if tracingTiming == nil {
+		tracingTiming = NewTraceTimings(ctx.ctx)
+	}
 
 	t := r.getTools()
 	defer r.putTools(t)

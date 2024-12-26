@@ -5,10 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/stretchr/testify/require"
 	"io"
 	"sync/atomic"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
@@ -502,6 +503,24 @@ func TestAuthorization(t *testing.T) {
 
 		return res, Context{ctx: context.Background(), Variables: nil, authorizer: authorizer},
 			`{"errors":[{"message":"Unauthorized to load field 'Query.me.reviews.product.data.name', Reason: Not allowed to fetch name on Product.","path":["me","reviews",0,"product","data","name"]},{"message":"Unauthorized to load field 'Query.me.reviews.product.data.name', Reason: Not allowed to fetch name on Product.","path":["me","reviews",1,"product","data","name"]}],"data":{"me":{"id":"1234","username":"Me","reviews":[null,null]}}}`
+	}))
+
+	t.Run("auth directive handling", testFnWithPostEvaluation(func(t *testing.T, ctrl *gomock.Controller) (node *GraphQLResponse, ctx *Context, expectedOutput string, postEvaluation func(t *testing.T)) {
+
+		authHandler := NewAuthHandler(context.Background())
+
+		res := generateTestFederationGraphQLResponseWithAuthDirective(t, ctrl)
+		resolveCtx := &Context{
+			ctx:        context.Background(),
+			Variables:  nil,
+			authorizer: authHandler,
+		}
+
+		return res, resolveCtx,
+			`{"data":{"me":{"id":"1234","username":"Me","reviews":[{"body":"A highly effective form of birth control.","product":{"upc":"top-1","name":"Trilby"}},{"body":"Fedoras are one of the most fashionable hats around and can look great with a variety of outfits.","product":{"upc":"top-2","name":"Fedora"}}]}}}`,
+			func(t *testing.T) {
+				require.Nil(t, resolveCtx.subgraphErrors)
+			}
 	}))
 }
 
@@ -1056,6 +1075,304 @@ func generateTestFederationGraphQLResponseWithoutAuthorizationRules(t *testing.T
 																ExactParentTypeName: "Product",
 																Source: TypeFieldSource{
 																	IDs: []string{"products"},
+																},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func generateTestFederationGraphQLResponseWithAuthDirective(t *testing.T, ctrl *gomock.Controller) *GraphQLResponse {
+	userService := NewMockDataSource(ctrl)
+	userService.EXPECT().
+		Load(gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(&bytes.Buffer{})).
+		DoAndReturn(func(ctx context.Context, input []byte, w *bytes.Buffer) (err error) {
+			actual := string(input)
+			expected := `{"method":"POST","url":"http://localhost:4001","body":{"query":"{me {id username}}"}}`
+			assert.Equal(t, expected, actual)
+			pair := NewBufPair()
+			pair.Data.WriteString(`{"me":{"id":"1234","username":"Me","__typename": "User"}}`)
+			return writeGraphqlResponse(pair, w, false)
+		}).AnyTimes()
+
+	reviewsService := NewMockDataSource(ctrl)
+	reviewsService.EXPECT().
+		Load(gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(&bytes.Buffer{})).
+		DoAndReturn(func(ctx context.Context, input []byte, w *bytes.Buffer) (err error) {
+			actual := string(input)
+			expected := `{"method":"POST","url":"http://localhost:4002","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on User {reviews {body product {upc __typename}}}}}","variables":{"representations":[{"__typename":"User","id":"1234"}]}}}`
+			assert.Equal(t, expected, actual)
+			pair := NewBufPair()
+			pair.Data.WriteString(`{"_entities": [{"__typename":"User","reviews": [{"body": "A highly effective form of birth control.","product": {"upc": "top-1","__typename": "Product"}},{"body": "Fedoras are one of the most fashionable hats around and can look great with a variety of outfits.","product": {"upc": "top-2","__typename": "Product"}}]}]}`)
+			return writeGraphqlResponse(pair, w, false)
+		}).AnyTimes()
+
+	productService := NewMockDataSource(ctrl)
+	productService.EXPECT().
+		Load(gomock.Any(), gomock.Any(), gomock.AssignableToTypeOf(&bytes.Buffer{})).
+		DoAndReturn(func(ctx context.Context, input []byte, w *bytes.Buffer) (err error) {
+			actual := string(input)
+			expected := `{"method":"POST","url":"http://localhost:4003","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name}}}","variables":{"representations":[{"__typename":"Product","upc":"top-1"},{"__typename":"Product","upc":"top-2"}]}}}`
+			assert.Equal(t, expected, actual)
+			pair := NewBufPair()
+			pair.Data.WriteString(`{"_entities": [{"name": "Trilby"},{"name": "Fedora"}]}`)
+			return writeGraphqlResponse(pair, w, false)
+		}).AnyTimes()
+
+	return &GraphQLResponse{
+		Data: &Object{
+			Fetch: &SingleFetch{
+				InputTemplate: InputTemplate{
+					Segments: []TemplateSegment{
+						{
+							Data:        []byte(`{"method":"POST","url":"http://localhost:4001","body":{"query":"{me {id username}}"}}`),
+							SegmentType: StaticSegmentType,
+						},
+					},
+				},
+				FetchConfiguration: FetchConfiguration{
+					DataSource: userService,
+					PostProcessing: PostProcessingConfiguration{
+						SelectResponseErrorsPath: []string{"errors"},
+						SelectResponseDataPath:   []string{"data"},
+					},
+				},
+				Info: &FetchInfo{
+					DataSourceID: "users",
+					RootFields: []GraphCoordinate{
+						{
+							TypeName:             "Query",
+							FieldName:            "me",
+							HasAuthorizationRule: true,
+							AuthDirectives:       []byte(`{"nullifyUnauthorizedEdges":{"name":"nullifyUnauthorizedEdges"}}`),
+						},
+					},
+				},
+			},
+			Fields: []*Field{
+				{
+					Name: []byte("me"),
+					Value: &Object{
+						Fetch: &SingleFetch{
+							InputTemplate: InputTemplate{
+								Segments: []TemplateSegment{
+									{
+										Data:        []byte(`{"method":"POST","url":"http://localhost:4002","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on User {reviews {body product {upc __typename}}}}}","variables":{"representations":[`),
+										SegmentType: StaticSegmentType,
+									},
+									{
+										SegmentType:  VariableSegmentType,
+										VariableKind: ResolvableObjectVariableKind,
+										Renderer: NewGraphQLVariableResolveRenderer(&Object{
+											Fields: []*Field{
+												{
+													Name: []byte("__typename"),
+													Value: &String{
+														Path: []string{"__typename"},
+													},
+												},
+												{
+													Name: []byte("id"),
+													Value: &String{
+														Path: []string{"id"},
+													},
+												},
+											},
+										}),
+									},
+									{
+										Data:        []byte(`]}}}`),
+										SegmentType: StaticSegmentType,
+									},
+								},
+							},
+							Info: &FetchInfo{
+								DataSourceID: "reviews",
+								RootFields: []GraphCoordinate{
+									{
+										TypeName:             "User",
+										FieldName:            "reviews",
+										HasAuthorizationRule: true,
+										AuthDirectives:       []byte(`{"nullifyUnauthorizedEdges":{"name":"nullifyUnauthorizedEdges"}}`),
+									},
+								},
+							},
+							FetchConfiguration: FetchConfiguration{
+								DataSource: reviewsService,
+								PostProcessing: PostProcessingConfiguration{
+									SelectResponseErrorsPath: []string{"errors"},
+									SelectResponseDataPath:   []string{"data", "_entities", "[0]"},
+								},
+							},
+						},
+						Path:     []string{"me"},
+						Nullable: true,
+						Fields: []*Field{
+							{
+								Name: []byte("id"),
+								Value: &String{
+									Path: []string{"id"},
+								},
+								Info: &FieldInfo{
+									Name:                "id",
+									ExactParentTypeName: "User",
+									Source: TypeFieldSource{
+										IDs: []string{"users"},
+									},
+								},
+							},
+							{
+								Name: []byte("username"),
+								Value: &String{
+									Path: []string{"username"},
+								},
+								Info: &FieldInfo{
+									Name:                "username",
+									ExactParentTypeName: "User",
+									Source: TypeFieldSource{
+										IDs: []string{"users"},
+									},
+								},
+							},
+							{
+								Name: []byte("reviews"),
+								Info: &FieldInfo{
+									Name:                "reviews",
+									ExactParentTypeName: "User",
+									Source: TypeFieldSource{
+										IDs: []string{"reviews"},
+									},
+									HasAuthorizationRule: true,
+								},
+								Value: &Array{
+									Path:     []string{"reviews"},
+									Nullable: true,
+									Item: &Object{
+										Nullable: true,
+										Fields: []*Field{
+											{
+												Name: []byte("body"),
+												Value: &String{
+													Path:     []string{"body"},
+													Nullable: true,
+												},
+												Info: &FieldInfo{
+													Name:                "body",
+													ExactParentTypeName: "Review",
+													Source: TypeFieldSource{
+														IDs: []string{"reviews"},
+													},
+													HasAuthorizationRule: true,
+												},
+											},
+											{
+												Name: []byte("product"),
+												Info: &FieldInfo{
+													Name:                "product",
+													ExactParentTypeName: "Review",
+													Source: TypeFieldSource{
+														IDs: []string{"reviews"},
+													},
+													HasAuthorizationRule: true,
+												},
+												Value: &Object{
+													Path: []string{"product"},
+													Fetch: &SingleFetch{
+														InputTemplate: InputTemplate{
+															Segments: []TemplateSegment{
+																{
+																	Data:        []byte(`{"method":"POST","url":"http://localhost:4003","body":{"query":"query($representations: [_Any!]!){_entities(representations: $representations){... on Product {name}}}","variables":{"representations":`),
+																	SegmentType: StaticSegmentType,
+																},
+																{
+																	SegmentType:  VariableSegmentType,
+																	VariableKind: ResolvableObjectVariableKind,
+																	Renderer: NewGraphQLVariableResolveRenderer(&Array{
+																		Item: &Object{
+																			Fields: []*Field{
+																				{
+																					Name: []byte("__typename"),
+																					Value: &String{
+																						Path: []string{"__typename"},
+																					},
+																				},
+																				{
+																					Name: []byte("upc"),
+																					Value: &String{
+																						Path: []string{"upc"},
+																					},
+																				},
+																			},
+																		},
+																	}),
+																},
+																{
+																	Data:        []byte(`}}}`),
+																	SegmentType: StaticSegmentType,
+																},
+															},
+														},
+														Info: &FetchInfo{
+															DataSourceID: "products",
+															RootFields: []GraphCoordinate{
+																{
+																	TypeName:  "Product",
+																	FieldName: "name",
+																},
+															},
+														},
+														FetchConfiguration: FetchConfiguration{
+															DataSource: productService,
+															PostProcessing: PostProcessingConfiguration{
+																SelectResponseDataPath: []string{"data", "_entities"},
+																MergePath:              []string{"data"},
+															},
+														},
+													},
+													Fields: []*Field{
+														{
+															Name: []byte("upc"),
+															Value: &String{
+																Path: []string{"upc"},
+															},
+															Info: &FieldInfo{
+																Name:                "upc",
+																ExactParentTypeName: "Product",
+																Source: TypeFieldSource{
+																	IDs: []string{"products"},
+																},
+															},
+														},
+														{
+															Name: []byte("name"),
+															Value: &String{
+																Path: []string{"data", "name"},
+															},
+															Info: &FieldInfo{
+																Name:                "name",
+																ExactParentTypeName: "Product",
+																Source: TypeFieldSource{
+																	IDs: []string{"products"},
+																},
+																HasAuthorizationRule: true,
+																AuthDirectives: map[string]DirectiveInfo{
+																	"nullifyUnauthorizedEdges": {
+																		Name: "nullifyUnauthorizedEdges",
+																		Arguments: map[string]interface{}{
+																			"reason": "Not allowed to fetch name on Product",
+																		},
+																	},
 																},
 															},
 														},

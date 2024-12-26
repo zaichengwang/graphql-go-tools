@@ -216,7 +216,27 @@ func (v *Visitor) EnterDirective(ref int) {
 		case "defer":
 			v.currentField.Defer = &resolve.DeferField{}
 		}
+		// Add auth directive handling
+		if fieldConfig := v.getCurrentFieldConfig(); fieldConfig != nil {
+			authHandler := NewAuthDirectiveHandler(v.Operation, v.Definition)
+			authHandler.HandleAuthDirective(ref, fieldConfig)
+		}
 	}
+}
+
+func (v *Visitor) getCurrentFieldConfig() *FieldConfiguration {
+	if len(v.Walker.Ancestors) == 0 {
+		return nil
+	}
+
+	ancestor := v.Walker.Ancestors[len(v.Walker.Ancestors)-1]
+	if ancestor.Kind != ast.NodeKindField {
+		return nil
+	}
+
+	typeName := v.Walker.EnclosingTypeDefinition.NameString(v.Definition)
+	fieldName := v.Operation.FieldNameString(ancestor.Ref)
+	return v.Config.Fields.ForTypeField(typeName, fieldName)
 }
 
 func (v *Visitor) EnterInlineFragment(ref int) {
@@ -389,15 +409,18 @@ func (v *Visitor) mapFieldConfig(ref int) {
 }
 
 func (v *Visitor) resolveFieldInfo(ref, typeRef int, onTypeNames [][]byte) *resolve.FieldInfo {
-	if !v.Config.IncludeInfo {
-		return nil
-	}
 
 	enclosingTypeName := v.Walker.EnclosingTypeDefinition.NameString(v.Definition)
 	fieldName := v.Operation.FieldNameString(ref)
 	fieldHasAuthorizationRule := v.fieldHasAuthorizationRule(enclosingTypeName, fieldName)
 	underlyingType := v.Definition.ResolveUnderlyingType(typeRef)
 	typeName := v.Definition.ResolveTypeNameString(typeRef)
+
+	hasAuthDirective := v.Config.HasFieldAuthDirective(enclosingTypeName, fieldName)
+
+	if !v.Config.IncludeInfo && !hasAuthDirective {
+		return nil
+	}
 
 	// if the value is not a named type, try to resolve the underlying type
 	if underlyingType != -1 {
@@ -421,6 +444,30 @@ func (v *Visitor) resolveFieldInfo(ref, typeRef int, onTypeNames [][]byte) *reso
 			sourceIDs = append(sourceIDs, v.planners[i].DataSourceConfiguration().Id())
 		}
 	}
+
+	fieldConfig := v.Config.Fields.ForTypeField(enclosingTypeName, fieldName)
+	authDirectives := make(map[string]resolve.DirectiveInfo)
+
+	if fieldConfig != nil && fieldConfig.Directives != nil {
+		for directiveName, directive := range fieldConfig.Directives {
+			authDirectives[directiveName] = resolve.DirectiveInfo{
+				Name:      directive.DirectiveName,
+				Arguments: directive.Arguments,
+			}
+		}
+	}
+
+	if hasAuthDirective {
+		directivesFromConfig := v.Config.GetFieldAuthDirectives(enclosingTypeName, fieldName)
+		for _, directive := range directivesFromConfig {
+			authDirectives[directive.DirectiveName] = resolve.DirectiveInfo{
+				Name:      directive.DirectiveName,
+				Arguments: directive.Arguments,
+			}
+
+		}
+	}
+
 	return &resolve.FieldInfo{
 		Name:            fieldName,
 		NamedType:       typeName,
@@ -430,6 +477,7 @@ func (v *Visitor) resolveFieldInfo(ref, typeRef int, onTypeNames [][]byte) *reso
 		},
 		ExactParentTypeName:  enclosingTypeName,
 		HasAuthorizationRule: fieldHasAuthorizationRule,
+		AuthDirectives:       authDirectives,
 	}
 }
 

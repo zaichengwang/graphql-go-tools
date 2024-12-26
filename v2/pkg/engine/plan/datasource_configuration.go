@@ -251,6 +251,7 @@ func NewDirectiveConfigurations(configs []DirectiveConfiguration) *DirectiveConf
 type DirectiveConfiguration struct {
 	DirectiveName string
 	RenameTo      string
+	Arguments     map[string]interface{}
 }
 
 func (d *DirectiveConfigurations) RenameTypeNameOnMatchStr(directiveName string) string {
