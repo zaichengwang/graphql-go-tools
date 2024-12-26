@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/cespare/xxhash/v2"
 	"io"
 	"net/http"
 	"regexp"
