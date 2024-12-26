@@ -508,7 +508,7 @@ func (r *Resolvable) authorizeField(ref int, field *Field) (skipField bool) {
 	if field.Info == nil {
 		return false
 	}
-	if !field.Info.HasAuthorizationRule {
+	if !field.Info.HasAuthorizationRule && len(field.Info.AuthDirectives) == 0 {
 		return false
 	}
 	if r.ctx.authorizer == nil {

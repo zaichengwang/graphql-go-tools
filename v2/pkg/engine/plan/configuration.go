@@ -28,6 +28,8 @@ type Configuration struct {
 	IncludeInfo bool
 
 	FieldDirectives map[string]map[string][]DirectiveConfiguration
+
+	SupportedAuthDirectives []string
 }
 
 func (c *Configuration) HasFieldAuthDirective(typeName, fieldName string) bool {
@@ -35,7 +37,7 @@ func (c *Configuration) HasFieldAuthDirective(typeName, fieldName string) bool {
 		if directives, ok := fieldDirectives[fieldName]; ok {
 			for _, d := range directives {
 				// Check if the directive name matches any of the auth directives
-				for _, authDirective := range AuthDirectives {
+				for _, authDirective := range c.SupportedAuthDirectives {
 					if d.DirectiveName == authDirective {
 						return true
 					}
@@ -53,7 +55,7 @@ func (c *Configuration) GetFieldAuthDirectives(typeName, fieldName string) []Dir
 		if directives, ok := fieldDirectives[fieldName]; ok {
 			for _, d := range directives {
 				// Check if the directive name matches any of the auth directives
-				for _, authDirective := range AuthDirectives {
+				for _, authDirective := range c.SupportedAuthDirectives {
 					if d.DirectiveName == authDirective {
 						result = append(result, d)
 						break // Break inner loop once we find a match

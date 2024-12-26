@@ -144,7 +144,7 @@ func (f *FederationEngineConfigFactory) ComposeRouterConfigString() (string, err
 }
 
 func (f *FederationEngineConfigFactory) BuildEngineConfigurationWithHeader(routerConfigString string,
-	header http.Header, rolloutConfigs []SubgraphRolloutConfig) (conf Configuration, err error) {
+	header http.Header, rolloutConfigs []SubgraphRolloutConfig, supportedAuthDirectives []string) (conf Configuration, err error) {
 
 	var intermediateConfig nodev1.RouterConfig
 	if err := protojson.Unmarshal([]byte(routerConfigString), &intermediateConfig); err != nil {
@@ -176,6 +176,7 @@ func (f *FederationEngineConfigFactory) BuildEngineConfigurationWithHeader(route
 	}
 	plannerConfiguration.DefaultFlushIntervalMillis = DefaultFlushIntervalInMilliseconds
 	plannerConfiguration.FieldDirectives = fieldDirectives
+	plannerConfiguration.SupportedAuthDirectives = supportedAuthDirectives
 
 	// uncomment for plan detail debugging
 
