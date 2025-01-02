@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	goerrors "errors"
 	"fmt"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/internal/unsafebytes"
 	"io"
 
 	"github.com/pkg/errors"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/astjson"
-	"github.com/wundergraph/graphql-go-tools/v2/pkg/internal/unsafebytes"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/pool"
 )
 
@@ -538,10 +538,40 @@ func (r *Resolvable) authorizeField(ref int, field *Field) (skipField bool) {
 		return true
 	}
 	if result != nil {
-		r.addRejectFieldError(result.Reason, dataSourceID, field)
-		return true
+		if !result.Partial {
+			r.addRejectFieldError(result.Reason, dataSourceID, field)
+			return true
+		}
+		// For partial results, replace the current field value with the filtered result
+		if err := r.replaceFieldWithFilteredResult(ref, field, result.FilteredResult); err != nil {
+			r.authorizationError = err
+			return true
+		}
+		r.addPartialRejectFieldError(result.Reason, dataSourceID, field)
 	}
 	return false
+}
+
+// New helper function to replace field value with filtered result
+func (r *Resolvable) replaceFieldWithFilteredResult(ref int, field *Field, filteredResult json.RawMessage) error {
+	if filteredResult == nil {
+		return errors.New("filtered result is nil for partial authorization")
+	}
+
+	// Create a new node with the filtered result using the storage's AppendAnyJSONBytes method
+	newRef, err := r.storage.AppendAnyJSONBytes(filteredResult)
+	if err != nil {
+		return fmt.Errorf("failed to parse filtered result: %w", err)
+	}
+
+	// Get the field's current node reference
+	currentRef := r.storage.Get(ref, field.Value.NodePath())
+	if r.storage.NodeIsDefined(currentRef) {
+		// Replace the node's content with the filtered result
+		r.storage.Nodes[currentRef] = r.storage.Nodes[newRef]
+	}
+
+	return nil
 }
 
 func (r *Resolvable) authorize(objectRef int, dataSourceID string, coordinate GraphCoordinate) (result *AuthorizationDeny, err error) {
@@ -550,12 +580,15 @@ func (r *Resolvable) authorize(objectRef int, dataSourceID string, coordinate Gr
 	_, _ = r.xxh.WriteString(coordinate.TypeName)
 	_, _ = r.xxh.WriteString(coordinate.FieldName)
 	decisionID := r.xxh.Sum64()
+
+	// We'll only cache complete deny/allow decisions
+	if reason, ok := r.authorizationDeny[decisionID]; ok {
+		return &AuthorizationDeny{Reason: reason, Partial: false}, nil
+	}
 	if _, ok := r.authorizationAllow[decisionID]; ok {
 		return nil, nil
 	}
-	if reason, ok := r.authorizationDeny[decisionID]; ok {
-		return &AuthorizationDeny{Reason: reason}, nil
-	}
+
 	if r.authorizationBufObjectRef != objectRef {
 		if r.authorizationBuf == nil {
 			r.authorizationBuf = bytes.NewBuffer(nil)
@@ -567,15 +600,19 @@ func (r *Resolvable) authorize(objectRef int, dataSourceID string, coordinate Gr
 		}
 		r.authorizationBufObjectRef = objectRef
 	}
+
 	result, err = r.ctx.authorizer.AuthorizeObjectField(r.ctx, dataSourceID, r.authorizationBuf.Bytes(), coordinate)
 	if err != nil {
 		return nil, err
 	}
+
+	// Only cache complete allow/deny decisions
 	if result == nil {
 		r.authorizationAllow[decisionID] = struct{}{}
-	} else {
+	} else if !result.Partial {
 		r.authorizationDeny[decisionID] = result.Reason
 	}
+
 	return result, nil
 }
 
@@ -589,6 +626,24 @@ func (r *Resolvable) addRejectFieldError(reason, dataSourceID string, field *Fie
 		errorMessage = fmt.Sprintf("Unauthorized to load field '%s'.", fieldPath)
 	} else {
 		errorMessage = fmt.Sprintf("Unauthorized to load field '%s', Reason: %s.", fieldPath, reason)
+	}
+	r.ctx.appendSubgraphError(goerrors.Join(errors.New(errorMessage), NewSubgraphError(dataSourceID, fieldPath, reason, 0)))
+
+	ref := r.storage.AppendErrorWithMessage(errorMessage, r.path)
+	r.storage.Nodes[r.errorsRoot].ArrayValues = append(r.storage.Nodes[r.errorsRoot].ArrayValues, ref)
+	r.popNodePathElement(nodePath)
+}
+
+func (r *Resolvable) addPartialRejectFieldError(reason, dataSourceID string, field *Field) {
+	nodePath := field.Value.NodePath()
+	r.pushNodePathElement(nodePath)
+	fieldPath := r.renderFieldPath()
+
+	var errorMessage string
+	if reason == "" {
+		errorMessage = fmt.Sprintf("Partial authorization failure for field '%s'.", fieldPath)
+	} else {
+		errorMessage = fmt.Sprintf("Partial authorization failure for field '%s', Reason: %s.", fieldPath, reason)
 	}
 	r.ctx.appendSubgraphError(goerrors.Join(errors.New(errorMessage), NewSubgraphError(dataSourceID, fieldPath, reason, 0)))
 

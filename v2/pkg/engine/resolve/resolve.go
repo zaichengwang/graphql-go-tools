@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/internal/xcontext"
 	"io"
 	"sync"
 	"time"
@@ -16,7 +17,6 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/ast"
-	"github.com/wundergraph/graphql-go-tools/v2/pkg/internal/xcontext"
 	"github.com/wundergraph/graphql-go-tools/v2/pkg/pool"
 )
 

@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/wundergraph/graphql-go-tools/v2/pkg/engine/datasource/httpclient"
 
 	"go.uber.org/atomic"
 )
@@ -33,7 +34,9 @@ type Context struct {
 }
 
 type AuthorizationDeny struct {
-	Reason string
+	Reason         string
+	Partial        bool
+	FilteredResult json.RawMessage
 }
 
 type Authorizer interface {
