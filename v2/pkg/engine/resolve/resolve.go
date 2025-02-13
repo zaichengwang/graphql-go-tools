@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"sync"
-	"time"
 
 	"github.com/alitto/pond"
 	"github.com/buger/jsonparser"
@@ -139,18 +138,7 @@ func New(ctx context.Context, options ResolverOptions) *Resolver {
 		resolver.limitMaxConcurrency = true
 		resolver.maxConcurrency = semaphore
 	}
-	if options.MaxSubscriptionWorkers == 0 {
-		options.MaxSubscriptionWorkers = 1024
-	}
-	resolver.triggerUpdatePool = pond.New(
-		options.MaxSubscriptionWorkers,
-		0,
-		pond.Context(ctx),
-		pond.IdleTimeout(time.Second*30),
-		pond.Strategy(pond.Lazy()),
-		pond.MinWorkers(16),
-	)
-	go resolver.handleEvents()
+
 	return resolver
 }
 
@@ -320,19 +308,6 @@ func (r *Resolver) executeSubscriptionUpdate(ctx *Context, sub *sub, sharedInput
 	if t.resolvable.WroteErrorsWithoutData() {
 		if r.options.Debug {
 			fmt.Printf("resolver:trigger:subscription:completing:errors_without_data:%d\n", sub.id.SubscriptionID)
-		}
-	}
-}
-
-func (r *Resolver) handleEvents() {
-	done := r.ctx.Done()
-	for {
-		select {
-		case <-done:
-			r.handleShutdown()
-			return
-		case event := <-r.events:
-			r.handleEvent(event)
 		}
 	}
 }
